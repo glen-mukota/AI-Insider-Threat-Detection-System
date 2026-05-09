@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
 using InsiderThreatDetection.ApplicationLayer;
 using InsiderThreatDetection.Core.Models;
 
@@ -16,9 +15,9 @@ namespace InsiderThreatDetection
         private string _lastDatasetPath = "insider_threat_clean_dataset.csv";
         private bool _modelReady = false;
 
-        // Track the last valid profile we intentionally selected.
-        // We use this to prevent the ComboBox from wandering after the pop-up closes.
-        private string _lastValidProfile = null;
+        // The index we genuinely selected (0 = "-- Select Profile --", 1 = Normal, etc.)
+        private int _confirmedProfileIndex = -1;
+        private bool _ignoreSelectionChange = false;
 
         public MainWindow()
         {
@@ -79,36 +78,31 @@ namespace InsiderThreatDetection
 
         private void SampleProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_ignoreSelectionChange) return;                   // we are forcing a reset
             if (!_modelReady) return;
-            if (e.AddedItems == null || e.AddedItems.Count == 0) return;
-            if (e.AddedItems[0] is not ComboBoxItem item || item.Content == null) return;
 
-            string profile = item.Content.ToString()!;
-            if (profile == "-- Select Profile --")
+            int newIndex = SampleProfileComboBox.SelectedIndex;
+            if (newIndex < 0) return;
+
+            // Ignore the placeholder
+            if (newIndex == 0)
             {
-                // If the user somehow selects the placeholder, don’t change anything
-                // and immediately restore the last valid profile if we had one.
-                if (_lastValidProfile != null)
+                if (_confirmedProfileIndex > 0)
                 {
-                    // Push the combo-box back to the last real profile after the message pump
-                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
-                    {
-                        // Find the ComboBoxItem that matches the last valid profile
-                        foreach (ComboBoxItem i in SampleProfileComboBox.Items)
-                        {
-                            if (i.Content?.ToString() == _lastValidProfile)
-                            {
-                                SampleProfileComboBox.SelectedItem = i;
-                                break;
-                            }
-                        }
-                    }));
+                    // instantly revert to the last confirmed real profile
+                    _ignoreSelectionChange = true;
+                    SampleProfileComboBox.SelectedIndex = _confirmedProfileIndex;
+                    _ignoreSelectionChange = false;
                 }
                 return;
             }
 
-            // We have a real profile
-            _lastValidProfile = profile;
+            // We have a real profile.  Remember it.
+            _confirmedProfileIndex = newIndex;
+
+            ComboBoxItem item = (ComboBoxItem)SampleProfileComboBox.SelectedItem;
+            string profile = item.Content.ToString();
+
             try
             {
                 var input = _controller.GetProfile(profile);
@@ -120,21 +114,18 @@ namespace InsiderThreatDetection
             }
             finally
             {
-                // After the MessageBox, WPF might have sent another SelectionChanged
-                // that could derail the dropdown. We forcefully re-apply the selection
-                // at a low priority to override any stray events.
-                string closedProfile = profile;   // capture for lambda
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                // After any message box, WPF WILL fire a stray SelectionChanged that
+                // takes the dropdown back to the previous index.  We crush it by
+                // re‑setting the correct index at a priority lower than any pending events.
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    foreach (ComboBoxItem it in SampleProfileComboBox.Items)
+                    if (SampleProfileComboBox.SelectedIndex != _confirmedProfileIndex)
                     {
-                        if (it.Content?.ToString() == closedProfile)
-                        {
-                            SampleProfileComboBox.SelectedItem = it;
-                            break;
-                        }
+                        _ignoreSelectionChange = true;
+                        SampleProfileComboBox.SelectedIndex = _confirmedProfileIndex;
+                        _ignoreSelectionChange = false;
                     }
-                }));
+                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
         }
 
