@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using InsiderThreatDetection.Core.Models;
 using InsiderThreatDetection.Infrastructure;
-using Microsoft.ML.Data;
 
 namespace InsiderThreatDetection.ApplicationLayer
 {
@@ -13,7 +12,6 @@ namespace InsiderThreatDetection.ApplicationLayer
     {
         private readonly MLModelManager _modelManager;
 
-        // Real benign profile that the model correctly classifies as NORMAL
         private UserBehaviour? _normalProfile;
 
         public ThreatDetectionController()
@@ -106,19 +104,14 @@ namespace InsiderThreatDetection.ApplicationLayer
             }
         }
 
-        // ---------- PUBLIC API ----------
         public ThreatPrediction Predict(UserBehaviour input) => _modelManager.Predict(input);
         public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input) => _modelManager.Explain(input);
         public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction) => _modelManager.GenerateHumanExplanation(input, prediction);
         public void SaveModel(string path) => _modelManager.SaveModel(path);
         public void LoadModel(string path) => _modelManager.LoadModel(path);
-        public BinaryClassificationMetrics? GetMetrics() => _modelManager.LastMetrics;
 
-        // Expose confusion matrix counts (TP, TN, FP, FN)
-        public double[][]? GetConfusionMatrixCounts() => _modelManager.GetConfusionMatrixCounts();
-
-        // Provide access to the MLModelManager (if needed for other purposes)
-        public MLModelManager GetModelManager() => _modelManager;
+        /// <summary> Returns the formatted evaluation summary (metrics + confusion matrix). </summary>
+        public string GetEvaluationSummary() => _modelManager.GetEvaluationSummary();
 
         public UserBehaviour LoadSingleRowFromCsv(string filePath, int rowIndex = 1)
         {
@@ -164,7 +157,6 @@ namespace InsiderThreatDetection.ApplicationLayer
             {
                 "Normal Office Worker" => _normalProfile
                     ?? throw new InvalidOperationException("Model must be trained before using the normal profile."),
-
                 "Suspicious Printing Activity" => new UserBehaviour
                 {
                     employee_seniority_years = 3f,
@@ -182,7 +174,6 @@ namespace InsiderThreatDetection.ApplicationLayer
                     late_exit_flag = 0,
                     entry_during_weekend = 1
                 },
-
                 "Excessive Facility Access" => new UserBehaviour
                 {
                     employee_seniority_years = 8f,
@@ -200,7 +191,6 @@ namespace InsiderThreatDetection.ApplicationLayer
                     late_exit_flag = 1,
                     entry_during_weekend = 1
                 },
-
                 "Critical Insider Threat" => new UserBehaviour
                 {
                     employee_seniority_years = 2f,
@@ -218,7 +208,6 @@ namespace InsiderThreatDetection.ApplicationLayer
                     late_exit_flag = 1,
                     entry_during_weekend = 1
                 },
-
                 _ => throw new ArgumentException("Unknown profile")
             };
         }

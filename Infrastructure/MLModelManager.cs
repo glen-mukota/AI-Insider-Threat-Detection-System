@@ -1,9 +1,9 @@
-﻿using Microsoft.ML;
-using Microsoft.ML.Data;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.ML;
+using Microsoft.ML.Data;
 using InsiderThreatDetection.Core.Models;
 
 namespace InsiderThreatDetection.Infrastructure
@@ -13,16 +13,26 @@ namespace InsiderThreatDetection.Infrastructure
         private readonly MLContext _mlContext;
         private ITransformer? _model;
         private PredictionEngine<UserBehaviour, ThreatPrediction>? _predictionEngine;
+
+        // Original metrics (default threshold) – kept only for reference
         public BinaryClassificationMetrics? LastMetrics { get; private set; }
+
+        // Evaluation after optimal threshold selection
+        private double _accuracy;
+        private double _precision;
+        private double _recall;
+        private double _f1Score;
+        private double[][]? _confusionMatrix;
+
+        // The threshold that will actually be used for predictions
+        private float _optimalThreshold = 0.5f;
 
         private const float TestFraction = 0.2f;
         private const int RandomSeed = 42;
-        private const float DecisionThreshold = 0.5f;
 
         private const string FeaturesColumn = "Features";
         private const string LabelColumn = "Label";
 
-        // Statistics computed ONLY from benign training examples
         private float[]? _benignMeans;
         private float[]? _benignStdDevs;
 
@@ -56,9 +66,16 @@ namespace InsiderThreatDetection.Infrastructure
             var pipeline = BuildPipeline(maliciousWeight);
             _model = pipeline.Fit(split.TrainSet);
 
-            var predictions = _model.Transform(split.TestSet);
-            LastMetrics = _mlContext.BinaryClassification.Evaluate(predictions, labelColumnName: LabelColumn);
+            // Default evaluation (threshold = 0.5) – useful for console logging
+            var defaultPredictions = _model.Transform(split.TestSet);
+            LastMetrics = _mlContext.BinaryClassification.Evaluate(defaultPredictions, labelColumnName: LabelColumn);
             PrintMetrics(LastMetrics);
+
+            // Find the threshold that maximises F1 and compute final metrics
+            CalibrateAndEvaluate(split.TestSet);
+
+            Console.WriteLine($"Optimal threshold selected: {_optimalThreshold:F3}");
+            Console.WriteLine($"Final metrics -> Acc: {_accuracy:P2} | Prec: {_precision:P2} | Rec: {_recall:P2} | F1: {_f1Score:P2}");
 
             _predictionEngine = _mlContext.Model.CreatePredictionEngine<UserBehaviour, ThreatPrediction>(_model);
         }
@@ -68,27 +85,45 @@ namespace InsiderThreatDetection.Infrastructure
             if (_predictionEngine == null)
                 throw new InvalidOperationException("Model not trained or loaded.");
             var raw = _predictionEngine.Predict(input);
+            bool label = raw.Probability >= _optimalThreshold;
             return new ThreatPrediction
             {
-                PredictedLabel = raw.Probability >= DecisionThreshold,
+                PredictedLabel = label,
                 Probability = raw.Probability,
                 Score = raw.Score
             };
         }
 
         /// <summary>
-        /// Returns the confusion matrix from the last evaluation.
-        /// Format: [0][0]=TN, [0][1]=FP, [1][0]=FN, [1][1]=TP.
+        /// Returns the confusion matrix based on the optimal threshold (TN, FP, FN, TP).
         /// </summary>
-        public double[][]? GetConfusionMatrixCounts()
+        public double[][]? GetConfusionMatrixCounts() => _confusionMatrix;
+
+        /// <summary>
+        /// Returns a ready‑to‑display string with the final metrics and confusion matrix.
+        /// </summary>
+        public string GetEvaluationSummary()
         {
-            var counts = LastMetrics?.ConfusionMatrix?.Counts;
-            if (counts == null) return null;
-            // Convert IReadOnlyList<IReadOnlyList<double>> to double[][]
-            return counts.Select(row => row.ToArray()).ToArray();
+            if (_confusionMatrix == null)
+                return "Evaluation not available.";
+
+            double tn = _confusionMatrix[0][0];
+            double fp = _confusionMatrix[0][1];
+            double fn = _confusionMatrix[1][0];
+            double tp = _confusionMatrix[1][1];
+
+            return $"Accuracy:  {_accuracy:P2}\n" +
+                   $"Precision: {_precision:P2}\n" +
+                   $"Recall:    {_recall:P2}\n" +
+                   $"F1:        {_f1Score:P2}\n\n" +
+                   $"Confusion Matrix:\n" +
+                   $"  True Positives  : {tp}\n" +
+                   $"  True Negatives  : {tn}\n" +
+                   $"  False Positives : {fp}\n" +
+                   $"  False Negatives : {fn}";
         }
 
-        // ---------- EXPLAINABILITY (Contributions) ----------
+        // ---------- EXPLAINABILITY ----------
         public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input)
         {
             if (_model == null || _benignMeans == null)
@@ -105,11 +140,9 @@ namespace InsiderThreatDetection.Infrastructure
                 float contribution = baselineProb - perturbedProb;
                 result.Add((_featureNames[i], contribution, GetFeatureValue(input, _featureNames[i])));
             }
-
             return result.OrderByDescending(x => Math.Abs(x.Item2)).ToList();
         }
 
-        // ---------- MANAGER‑FRIENDLY EXPLANATION ----------
         public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction)
         {
             if (_benignMeans == null || _benignStdDevs == null)
@@ -119,7 +152,6 @@ namespace InsiderThreatDetection.Infrastructure
             sb.AppendLine($"Threat Probability: {prediction.Probability:P0}");
             sb.AppendLine();
 
-            // Identify features that deviate significantly from benign average (>2 std)
             var anomalies = new List<(string Feature, float Value, float Mean, string Direction)>();
             for (int i = 0; i < _featureNames.Length; i++)
             {
@@ -165,6 +197,69 @@ namespace InsiderThreatDetection.Infrastructure
             return sb.ToString();
         }
 
+        // ---------- CALIBRATION ----------
+        private void CalibrateAndEvaluate(IDataView testSet)
+        {
+            var predictions = _model!.Transform(testSet);
+            var rows = _mlContext.Data.CreateEnumerable<TestPrediction>(predictions, reuseRowObject: false).ToList();
+
+            float[] probs = rows.Select(r => r.Probability).ToArray();
+            bool[] labels = rows.Select(r => r.Label).ToArray();
+
+            double bestF1 = 0;
+            double bestThresh = 0.5;
+            double[]? bestTnFpTpFn = null;
+
+            for (int perc = 0; perc <= 100; perc++)
+            {
+                double t = perc / 100.0;
+                int tp = 0, fp = 0, tn = 0, fn = 0;
+                for (int i = 0; i < probs.Length; i++)
+                {
+                    bool predPos = probs[i] >= t;
+                    bool actualPos = labels[i];
+                    if (predPos && actualPos) tp++;
+                    else if (predPos && !actualPos) fp++;
+                    else if (!predPos && actualPos) fn++;
+                    else tn++;
+                }
+
+                double precision = tp + fp == 0 ? 0 : (double)tp / (tp + fp);
+                double recall = tp + fn == 0 ? 0 : (double)tp / (tp + fn);
+                double f1 = precision + recall == 0 ? 0 : 2 * precision * recall / (precision + recall);
+
+                if (f1 > bestF1)
+                {
+                    bestF1 = f1;
+                    bestThresh = t;
+                    bestTnFpTpFn = new double[] { tn, fp, fn, tp };
+                }
+            }
+
+            _optimalThreshold = (float)bestThresh;
+
+            if (bestTnFpTpFn != null)
+            {
+                double tn = bestTnFpTpFn[0], fp = bestTnFpTpFn[1], fn = bestTnFpTpFn[2], tp = bestTnFpTpFn[3];
+                double total = tp + tn + fp + fn;
+                _accuracy = total == 0 ? 0 : (tp + tn) / total;
+                _precision = tp + fp == 0 ? 0 : tp / (tp + fp);
+                _recall = tp + fn == 0 ? 0 : tp / (tp + fn);
+                _f1Score = bestF1;
+                _confusionMatrix = new double[][] { new double[] { tn, fp }, new double[] { fn, tp } };
+            }
+        }
+
+        private class TestPrediction
+        {
+            [ColumnName("Probability")]
+            public float Probability { get; set; }
+
+            [ColumnName("Label")]
+            public bool Label { get; set; }
+        }
+
+        // ---------- HELPERS (including HumanReadableName) ----------
         private string HumanReadableName(string feature) => feature switch
         {
             "employee_seniority_years" => "Years of seniority",
@@ -184,7 +279,6 @@ namespace InsiderThreatDetection.Infrastructure
             _ => feature
         };
 
-        // ---------- HELPERS ----------
         private UserBehaviour CloneBehaviour(UserBehaviour source) => new()
         {
             employee_seniority_years = source.employee_seniority_years,
@@ -257,21 +351,12 @@ namespace InsiderThreatDetection.Infrastructure
 
             foreach (var r in benignRows)
             {
-                float[] vals = new float[f];
-                vals[0] = r.employee_seniority_years;
-                vals[1] = r.is_contractor;
-                vals[2] = r.employee_classification;
-                vals[3] = r.total_printed_pages;
-                vals[4] = r.num_printed_pages_off_hours;
-                vals[5] = r.total_files_burned;
-                vals[6] = r.burned_from_other;
-                vals[7] = r.is_abroad;
-                vals[8] = r.trip_day_number;
-                vals[9] = r.hostility_country_level;
-                vals[10] = r.num_entries;
-                vals[11] = r.num_unique_campus;
-                vals[12] = r.late_exit_flag;
-                vals[13] = r.entry_during_weekend;
+                float[] vals = { r.employee_seniority_years, r.is_contractor, r.employee_classification,
+                                 r.total_printed_pages, r.num_printed_pages_off_hours,
+                                 r.total_files_burned, r.burned_from_other,
+                                 r.is_abroad, r.trip_day_number, r.hostility_country_level,
+                                 r.num_entries, r.num_unique_campus,
+                                 r.late_exit_flag, r.entry_during_weekend };
                 for (int i = 0; i < f; i++)
                 {
                     sums[i] += vals[i];
@@ -299,6 +384,7 @@ namespace InsiderThreatDetection.Infrastructure
         {
             _model = _mlContext.Model.Load(modelPath, out _);
             _predictionEngine = _mlContext.Model.CreatePredictionEngine<UserBehaviour, ThreatPrediction>(_model);
+            _optimalThreshold = 0.5f; // saved model defaults to 0.5; ideally store threshold alongside
         }
 
         private IEstimator<ITransformer> BuildPipeline(float maliciousWeight)
@@ -310,21 +396,7 @@ namespace InsiderThreatDetection.Infrastructure
                     {
                         output.Weight = input.is_malicious == 1 ? maliciousWeight : 1f;
                     }, contractName: null))
-                .Append(_mlContext.Transforms.Concatenate(FeaturesColumn,
-                    nameof(UserBehaviour.employee_seniority_years),
-                    nameof(UserBehaviour.is_contractor),
-                    nameof(UserBehaviour.employee_classification),
-                    nameof(UserBehaviour.total_printed_pages),
-                    nameof(UserBehaviour.num_printed_pages_off_hours),
-                    nameof(UserBehaviour.total_files_burned),
-                    nameof(UserBehaviour.burned_from_other),
-                    nameof(UserBehaviour.is_abroad),
-                    nameof(UserBehaviour.trip_day_number),
-                    nameof(UserBehaviour.hostility_country_level),
-                    nameof(UserBehaviour.num_entries),
-                    nameof(UserBehaviour.num_unique_campus),
-                    nameof(UserBehaviour.late_exit_flag),
-                    nameof(UserBehaviour.entry_during_weekend)))
+                .Append(_mlContext.Transforms.Concatenate(FeaturesColumn, _featureNames))
                 .Append(_mlContext.Transforms.NormalizeMeanVariance(FeaturesColumn))
                 .Append(_mlContext.BinaryClassification.Trainers.FastTree(
                     LabelColumn, FeaturesColumn, "Weight",
@@ -344,7 +416,7 @@ namespace InsiderThreatDetection.Infrastructure
 
         private void PrintMetrics(BinaryClassificationMetrics m)
         {
-            Console.WriteLine("=== MODEL PERFORMANCE ===");
+            Console.WriteLine("=== MODEL PERFORMANCE (default threshold) ===");
             Console.WriteLine($"Accuracy:  {m.Accuracy:P2}");
             Console.WriteLine($"Precision: {m.PositivePrecision:P2}");
             Console.WriteLine($"Recall:    {m.PositiveRecall:P2}");

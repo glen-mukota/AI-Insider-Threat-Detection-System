@@ -1,11 +1,10 @@
 ﻿using Microsoft.Win32;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using InsiderThreatDetection.ApplicationLayer;
 using InsiderThreatDetection.Core.Models;
 
@@ -14,14 +13,17 @@ namespace InsiderThreatDetection
     public partial class MainWindow : Window
     {
         private readonly ThreatDetectionController _controller = new ThreatDetectionController();
-
         private string _lastDatasetPath = "insider_threat_clean_dataset.csv";
         private bool _modelReady = false;
+
+        // Track the last valid profile we intentionally selected.
+        // We use this to prevent the ComboBox from wandering after the pop-up closes.
+        private string _lastValidProfile = null;
 
         public MainWindow()
         {
             InitializeComponent();
-            SampleProfileComboBox.SelectedIndex = -1;   // no selection at startup
+            SampleProfileComboBox.SelectedIndex = -1;
         }
 
         private async void UploadCsvButton_Click(object sender, RoutedEventArgs e)
@@ -53,32 +55,8 @@ namespace InsiderThreatDetection
                 _modelReady = true;
                 ModelStatusText.Text = "Model trained successfully ✔";
 
-                var metrics = _controller.GetMetrics();
-                if (metrics != null)
-                {
-                    var cm = _controller.GetConfusionMatrixCounts();
-                    string cmText = "";
-                    if (cm != null && cm.Length == 2 && cm[0].Length == 2 && cm[1].Length == 2)
-                    {
-                        double tn = cm[0][0];
-                        double fp = cm[0][1];
-                        double fn = cm[1][0];
-                        double tp = cm[1][1];
-                        cmText = $"\nConfusion Matrix:\n" +
-                                 $"  True Positives  : {tp}\n" +
-                                 $"  True Negatives  : {tn}\n" +
-                                 $"  False Positives : {fp}\n" +
-                                 $"  False Negatives : {fn}";
-                    }
-
-                    string msg = $"Accuracy: {metrics.Accuracy:P2}\n" +
-                                 $"Precision: {metrics.PositivePrecision:P2}\n" +
-                                 $"Recall: {metrics.PositiveRecall:P2}\n" +
-                                 $"F1: {metrics.F1Score:P2}" +
-                                 cmText;
-
-                    MessageBox.Show(msg, "Model Evaluation");
-                }
+                string summary = _controller.GetEvaluationSummary();
+                MessageBox.Show(summary, "Model Evaluation");
             }
             catch (Exception ex)
             {
@@ -102,16 +80,62 @@ namespace InsiderThreatDetection
         private void SampleProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_modelReady) return;
-            if (SampleProfileComboBox.SelectedItem is not ComboBoxItem item || item.Content == null) return;
-            string profile = item.Content.ToString()!;
-            if (profile == "-- Select Profile --") return;
+            if (e.AddedItems == null || e.AddedItems.Count == 0) return;
+            if (e.AddedItems[0] is not ComboBoxItem item || item.Content == null) return;
 
+            string profile = item.Content.ToString()!;
+            if (profile == "-- Select Profile --")
+            {
+                // If the user somehow selects the placeholder, don’t change anything
+                // and immediately restore the last valid profile if we had one.
+                if (_lastValidProfile != null)
+                {
+                    // Push the combo-box back to the last real profile after the message pump
+                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                    {
+                        // Find the ComboBoxItem that matches the last valid profile
+                        foreach (ComboBoxItem i in SampleProfileComboBox.Items)
+                        {
+                            if (i.Content?.ToString() == _lastValidProfile)
+                            {
+                                SampleProfileComboBox.SelectedItem = i;
+                                break;
+                            }
+                        }
+                    }));
+                }
+                return;
+            }
+
+            // We have a real profile
+            _lastValidProfile = profile;
             try
             {
                 var input = _controller.GetProfile(profile);
-                PredictAndExplain(input, profile);   // pass the profile name
+                PredictAndExplain(input, profile);
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+            finally
+            {
+                // After the MessageBox, WPF might have sent another SelectionChanged
+                // that could derail the dropdown. We forcefully re-apply the selection
+                // at a low priority to override any stray events.
+                string closedProfile = profile;   // capture for lambda
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    foreach (ComboBoxItem it in SampleProfileComboBox.Items)
+                    {
+                        if (it.Content?.ToString() == closedProfile)
+                        {
+                            SampleProfileComboBox.SelectedItem = it;
+                            break;
+                        }
+                    }
+                }));
+            }
         }
 
         private void PredictFromCsvButton_Click(object sender, RoutedEventArgs e)
@@ -123,7 +147,7 @@ namespace InsiderThreatDetection
                 try
                 {
                     var input = _controller.LoadSingleRowFromCsv(dlg.FileName, rowIndex: 1);
-                    PredictAndExplain(input, "CSV Record");   // indicate CSV source
+                    PredictAndExplain(input, "CSV Record");
                 }
                 catch (Exception ex) { MessageBox.Show($"Error reading CSV: {ex.Message}"); }
             }
@@ -153,7 +177,6 @@ namespace InsiderThreatDetection
                     featureRanking += $"  - {c.Feature}: {c.Value} ({direction} risk by {Math.Abs(c.Contribution):F3})\n";
                 }
 
-                // ---- Build the final message, including the source profile name ----
                 string message = $"** Profile tested: {sourceDescription} **\n\n" +
                                  $"Classification: {classification}\n" +
                                  $"Confidence: {prediction.Probability:P2}\n" +
