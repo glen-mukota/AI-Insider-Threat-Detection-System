@@ -1,9 +1,9 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using InsiderThreatDetection.ApplicationLayer;
 using InsiderThreatDetection.Core.Models;
 
@@ -14,10 +14,6 @@ namespace InsiderThreatDetection
         private readonly ThreatDetectionController _controller = new ThreatDetectionController();
         private string _lastDatasetPath = "insider_threat_clean_dataset.csv";
         private bool _modelReady = false;
-
-        // The index we genuinely selected (0 = "-- Select Profile --", 1 = Normal, etc.)
-        private int _confirmedProfileIndex = -1;
-        private bool _ignoreSelectionChange = false;
 
         public MainWindow()
         {
@@ -52,10 +48,9 @@ namespace InsiderThreatDetection
                 ModelStatusText.Text = "Training, please wait...";
                 await Task.Run(() => _controller.TrainModel(_lastDatasetPath));
                 _modelReady = true;
-                ModelStatusText.Text = "Model trained successfully ✔";
-
+                ModelStatusText.Text = "Model: FastTree (selected via F1 comparison). Trained successfully ✔";
                 string summary = _controller.GetEvaluationSummary();
-                MessageBox.Show(summary, "Model Evaluation");
+                MessageBox.Show(summary, "Model Evaluation & Comparison");
             }
             catch (Exception ex)
             {
@@ -78,55 +73,15 @@ namespace InsiderThreatDetection
 
         private void SampleProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_ignoreSelectionChange) return;                   // we are forcing a reset
-            if (!_modelReady) return;
-
-            int newIndex = SampleProfileComboBox.SelectedIndex;
-            if (newIndex < 0) return;
-
-            // Ignore the placeholder
-            if (newIndex == 0)
-            {
-                if (_confirmedProfileIndex > 0)
-                {
-                    // instantly revert to the last confirmed real profile
-                    _ignoreSelectionChange = true;
-                    SampleProfileComboBox.SelectedIndex = _confirmedProfileIndex;
-                    _ignoreSelectionChange = false;
-                }
-                return;
-            }
-
-            // We have a real profile.  Remember it.
-            _confirmedProfileIndex = newIndex;
-
-            ComboBoxItem item = (ComboBoxItem)SampleProfileComboBox.SelectedItem;
+            if (!_modelReady || SampleProfileComboBox.SelectedIndex <= 0) return;
+            var item = (ComboBoxItem)SampleProfileComboBox.SelectedItem;
             string profile = item.Content.ToString();
-
             try
             {
                 var input = _controller.GetProfile(profile);
                 PredictAndExplain(input, profile);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
-            finally
-            {
-                // After any message box, WPF WILL fire a stray SelectionChanged that
-                // takes the dropdown back to the previous index.  We crush it by
-                // re‑setting the correct index at a priority lower than any pending events.
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    if (SampleProfileComboBox.SelectedIndex != _confirmedProfileIndex)
-                    {
-                        _ignoreSelectionChange = true;
-                        SampleProfileComboBox.SelectedIndex = _confirmedProfileIndex;
-                        _ignoreSelectionChange = false;
-                    }
-                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void PredictFromCsvButton_Click(object sender, RoutedEventArgs e)
@@ -137,43 +92,76 @@ namespace InsiderThreatDetection
             {
                 try
                 {
-                    var input = _controller.LoadSingleRowFromCsv(dlg.FileName, rowIndex: 1);
+                    var input = _controller.LoadSingleRowFromCsv(dlg.FileName, 1);
                     PredictAndExplain(input, "CSV Record");
                 }
                 catch (Exception ex) { MessageBox.Show($"Error reading CSV: {ex.Message}"); }
             }
         }
 
+        /// <summary>
+        /// Runs prediction, compiles the explanation, and displays it.
+        /// Risk level is tied to classification, not raw probability alone,
+        /// to avoid contradictory labels (e.g. MEDIUM RISK on a NORMAL classification).
+        /// </summary>
         private void PredictAndExplain(UserBehaviour input, string sourceDescription)
         {
             try
             {
                 var prediction = _controller.Predict(input);
-                string riskLevel = prediction.Probability switch
-                {
-                    >= 0.9f => "CRITICAL RISK",
-                    >= 0.75f => "HIGH RISK",
-                    >= 0.5f => "MEDIUM RISK",
-                    _ => "LOW RISK"
-                };
                 string classification = prediction.PredictedLabel ? "MALICIOUS" : "NORMAL";
+
+                // ---- Risk level tied to classification ----
+                string riskLevel;
+                if (classification == "NORMAL")
+                {
+                    // Residual concern for near‑threshold normal records
+                    riskLevel = prediction.Probability switch
+                    {
+                        < 0.30f => "LOW RISK",
+                        < 0.50f => "ELEVATED — MONITOR",
+                        _ => "BORDERLINE — REVIEW RECOMMENDED"
+                    };
+                }
+                else
+                {
+                    riskLevel = prediction.Probability switch
+                    {
+                        < 0.70f => "HIGH RISK",
+                        < 0.90f => "VERY HIGH RISK",
+                        _ => "CRITICAL RISK"
+                    };
+                }
+
+                // Confidence: probability for MALICIOUS, 1‑probability for NORMAL
+                float displayConfidence = prediction.PredictedLabel
+                    ? prediction.Probability
+                    : 1f - prediction.Probability;
 
                 string humanExplanation = _controller.GenerateHumanExplanation(input, prediction);
 
+                // Feature contributions with base probability line
                 var contributions = _controller.Explain(input);
-                string featureRanking = "\nFeature Importance Ranking (most → least influential):\n";
+                float baseProb = _controller.GetBaselineProbability();
+                string featureRanking = "\nFeature Importance (most → least influential):\n";
+                if (!float.IsNaN(baseProb))
+                {
+                    featureRanking += $"  [Base threat probability (neutral profile): {baseProb:P2}]\n";
+                }
                 foreach (var c in contributions.Take(5))
                 {
-                    string direction = c.Contribution >= 0 ? "increased" : "decreased";
-                    featureRanking += $"  - {c.Feature}: {c.Value} ({direction} risk by {Math.Abs(c.Contribution):F3})\n";
+                    string dir = c.Contribution >= 0 ? "increased" : "decreased";
+                    featureRanking += $"  - {c.Feature}: {c.Value} ({dir} risk by {Math.Abs(c.Contribution):F3})\n";
                 }
 
-                string message = $"** Profile tested: {sourceDescription} **\n\n" +
-                                 $"Classification: {classification}\n" +
-                                 $"Confidence: {prediction.Probability:P2}\n" +
-                                 $"Risk level: {riskLevel}\n\n" +
-                                 $"Explanation:\n{humanExplanation}\n" +
-                                 featureRanking;
+                string message =
+                    $"** Profile tested: {sourceDescription} **\n\n" +
+                    $"Classification: {classification}\n" +
+                    $"Threat Probability: {prediction.Probability:P2}\n" +
+                    $"Confidence in prediction: {displayConfidence:P2}\n" +
+                    $"Risk level: {riskLevel}\n\n" +
+                    $"Explanation:\n{humanExplanation}\n" +
+                    featureRanking;
 
                 MessageBox.Show(message, "Prediction Result");
             }

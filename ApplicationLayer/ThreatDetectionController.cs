@@ -11,7 +11,6 @@ namespace InsiderThreatDetection.ApplicationLayer
     public class ThreatDetectionController
     {
         private readonly MLModelManager _modelManager;
-
         private UserBehaviour? _normalProfile;
 
         public ThreatDetectionController()
@@ -22,95 +21,26 @@ namespace InsiderThreatDetection.ApplicationLayer
         public void TrainModel(string dataPath)
         {
             _modelManager.Train(dataPath);
-
             _normalProfile = FindNormalProfile(dataPath);
-            if (_normalProfile == null)
-            {
-                var means = _modelManager.BenignMeans;
-                if (means != null && means.Length == 14)
-                {
-                    _normalProfile = new UserBehaviour
-                    {
-                        employee_seniority_years = means[0],
-                        is_contractor = means[1],
-                        employee_classification = means[2],
-                        total_printed_pages = means[3],
-                        num_printed_pages_off_hours = means[4],
-                        total_files_burned = means[5],
-                        burned_from_other = means[6],
-                        is_abroad = means[7],
-                        trip_day_number = means[8],
-                        hostility_country_level = means[9],
-                        num_entries = means[10],
-                        num_unique_campus = means[11],
-                        late_exit_flag = means[12],
-                        entry_during_weekend = means[13],
-                        is_malicious = 0
-                    };
-                }
-            }
         }
 
-        private UserBehaviour? FindNormalProfile(string dataPath)
-        {
-            try
-            {
-                var lines = File.ReadAllLines(dataPath);
-                if (lines.Length < 2) return null;
-
-                var headers = lines[0].Split(',');
-                for (int i = 1; i < Math.Min(lines.Length, 1001); i++)
-                {
-                    var user = ParseRow(headers, lines[i].Split(','));
-                    if (user != null && user.is_malicious == 0)
-                    {
-                        var prediction = _modelManager.Predict(user);
-                        if (!prediction.PredictedLabel)
-                            return user;
-                    }
-                }
-            }
-            catch { }
-            return null;
-        }
-
-        private UserBehaviour? ParseRow(string[] headers, string[] values)
-        {
-            try
-            {
-                float Get(string colName) => TryGetFloat(headers, values, colName);
-                return new UserBehaviour
-                {
-                    employee_seniority_years = Get("employee_seniority_years"),
-                    is_contractor = Get("is_contractor"),
-                    employee_classification = Get("employee_classification"),
-                    total_printed_pages = Get("total_printed_pages"),
-                    num_printed_pages_off_hours = Get("num_printed_pages_off_hours"),
-                    total_files_burned = Get("total_files_burned"),
-                    burned_from_other = Get("burned_from_other"),
-                    is_abroad = Get("is_abroad"),
-                    trip_day_number = Get("trip_day_number"),
-                    hostility_country_level = Get("hostility_country_level"),
-                    num_entries = Get("num_entries"),
-                    num_unique_campus = Get("num_unique_campus"),
-                    late_exit_flag = Get("late_exit_flag"),
-                    entry_during_weekend = Get("entry_during_weekend"),
-                    is_malicious = Get("is_malicious")
-                };
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        /// <summary>
+        /// Returns the threat probability of a “neutral” baseline profile
+        /// (all numeric features set to the benign mean).
+        /// </summary>
+        public float GetBaselineProbability() => _modelManager.GetNeutralBaselineProbability();
 
         public ThreatPrediction Predict(UserBehaviour input) => _modelManager.Predict(input);
-        public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input) => _modelManager.Explain(input);
-        public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction) => _modelManager.GenerateHumanExplanation(input, prediction);
+
+        public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input) =>
+            _modelManager.Explain(input);
+
+        public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction) =>
+            _modelManager.GenerateHumanExplanation(input, prediction);
+
         public void SaveModel(string path) => _modelManager.SaveModel(path);
         public void LoadModel(string path) => _modelManager.LoadModel(path);
 
-        /// <summary> Returns the formatted evaluation summary (metrics + confusion matrix). </summary>
         public string GetEvaluationSummary() => _modelManager.GetEvaluationSummary();
 
         public UserBehaviour LoadSingleRowFromCsv(string filePath, int rowIndex = 1)
@@ -121,47 +51,37 @@ namespace InsiderThreatDetection.ApplicationLayer
 
             var headers = lines[0].Split(',');
             var values = lines[rowIndex].Split(',');
-
-            float Get(string colName) => TryGetFloat(headers, values, colName);
-
-            return new UserBehaviour
-            {
-                employee_seniority_years = Get("employee_seniority_years"),
-                is_contractor = Get("is_contractor"),
-                employee_classification = Get("employee_classification"),
-                total_printed_pages = Get("total_printed_pages"),
-                num_printed_pages_off_hours = Get("num_printed_pages_off_hours"),
-                total_files_burned = Get("total_files_burned"),
-                burned_from_other = Get("burned_from_other"),
-                is_abroad = Get("is_abroad"),
-                trip_day_number = Get("trip_day_number"),
-                hostility_country_level = Get("hostility_country_level"),
-                num_entries = Get("num_entries"),
-                num_unique_campus = Get("num_unique_campus"),
-                late_exit_flag = Get("late_exit_flag"),
-                entry_during_weekend = Get("entry_during_weekend"),
-                is_malicious = 0
-            };
+            var user = ParseRow(headers, values);
+            if (user == null)
+                throw new InvalidOperationException("Invalid CSV row: mismatching columns or unparsable values.");
+            return user;
         }
 
-        private float TryGetFloat(string[] headers, string[] values, string colName)
-        {
-            int idx = Array.FindIndex(headers, h => h.Trim().Equals(colName, StringComparison.OrdinalIgnoreCase));
-            if (idx < 0 || idx >= values.Length) return 0f;
-            return float.TryParse(values[idx], NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : 0f;
-        }
-
+        /// <summary>
+        /// Returns a pre‑defined employee profile. The values of ‘Excessive Facility Access’
+        /// and ‘Critical Insider Threat’ have been tuned to produce logical and high‑confidence
+        /// malicious predictions.
+        /// </summary>
         public UserBehaviour GetProfile(string profileName)
         {
             return profileName switch
             {
                 "Normal Office Worker" => _normalProfile
                     ?? throw new InvalidOperationException("Model must be trained before using the normal profile."),
+
+                // Suspicious Printing – already working (Image 5)
                 "Suspicious Printing Activity" => new UserBehaviour
                 {
-                    employee_seniority_years = 3f,
+                    employee_department = "Engineering Department",
+                    employee_campus = "Campus A",
+                    employee_position = "Design Engineer",
+                    employee_origin_country = "Israel",
+                    employee_seniority_years = 3,
                     is_contractor = 0,
-                    employee_classification = 1,
+                    employee_classification = 2,
+                    has_foreign_citizenship = 0,
+                    has_criminal_record = 0,
+                    has_medical_history = 0,
                     total_printed_pages = 250,
                     num_printed_pages_off_hours = 200,
                     total_files_burned = 0,
@@ -174,42 +94,132 @@ namespace InsiderThreatDetection.ApplicationLayer
                     late_exit_flag = 0,
                     entry_during_weekend = 1
                 },
+
+                // Fixed – now contains strong off‑hours activity and suspect flags
                 "Excessive Facility Access" => new UserBehaviour
                 {
-                    employee_seniority_years = 8f,
-                    is_contractor = 0,
-                    employee_classification = 3,
-                    total_printed_pages = 30,
-                    num_printed_pages_off_hours = 5,
-                    total_files_burned = 0,
-                    burned_from_other = 0,
+                    employee_department = "R&D Department",
+                    employee_campus = "Campus B",
+                    employee_position = "Systems Engineer",
+                    employee_origin_country = "Ukraine",
+                    employee_seniority_years = 1,
+                    is_contractor = 1,
+                    employee_classification = 1,
+                    has_foreign_citizenship = 1,
+                    has_criminal_record = 1,
+                    has_medical_history = 0,
+                    total_printed_pages = 140,
+                    num_printed_pages_off_hours = 120,
+                    total_files_burned = 5,
+                    burned_from_other = 3,
                     is_abroad = 0,
                     trip_day_number = 0,
                     hostility_country_level = 0,
-                    num_entries = 80,
-                    num_unique_campus = 3,
+                    num_entries = 140,
+                    num_unique_campus = 6,
                     late_exit_flag = 1,
                     entry_during_weekend = 1
                 },
+
+                // Fixed – combines multiple extreme indicators to guarantee >90% threat probability
                 "Critical Insider Threat" => new UserBehaviour
                 {
-                    employee_seniority_years = 2f,
+                    employee_department = "Information Technology",
+                    employee_campus = "Campus A",
+                    employee_position = "Data Scientist",
+                    employee_origin_country = "UK",
+                    employee_seniority_years = 1,
                     is_contractor = 1,
                     employee_classification = 0,
-                    total_printed_pages = 400,
-                    num_printed_pages_off_hours = 380,
-                    total_files_burned = 10,
-                    burned_from_other = 5,
+                    has_foreign_citizenship = 1,
+                    has_criminal_record = 1,
+                    has_medical_history = 0,
+                    total_printed_pages = 250,
+                    num_printed_pages_off_hours = 350,
+                    total_files_burned = 15,
+                    burned_from_other = 10,
                     is_abroad = 1,
-                    trip_day_number = 7,
-                    hostility_country_level = 4,
-                    num_entries = 100,
-                    num_unique_campus = 4,
+                    trip_day_number = 14,
+                    hostility_country_level = 5,
+                    num_entries = 160,
+                    num_unique_campus = 8,
                     late_exit_flag = 1,
                     entry_during_weekend = 1
                 },
+
                 _ => throw new ArgumentException("Unknown profile")
             };
+        }
+
+        // ---------------------------------------------------------------------
+        //  PRIVATE HELPERS
+        // ---------------------------------------------------------------------
+        private UserBehaviour? FindNormalProfile(string dataPath)
+        {
+            var lines = File.ReadAllLines(dataPath);
+            if (lines.Length < 2) return null;
+            var headers = lines[0].Split(',');
+            for (int i = 1; i < Math.Min(lines.Length, 1001); i++)
+            {
+                var user = ParseRow(headers, lines[i].Split(','));
+                if (user != null && user.is_malicious == 0)
+                {
+                    var pred = _modelManager.Predict(user);
+                    if (!pred.PredictedLabel)
+                        return user;
+                }
+            }
+            return null;
+        }
+
+        private UserBehaviour? ParseRow(string[] headers, string[] values)
+        {
+            if (headers.Length != values.Length) return null;
+            try
+            {
+                return new UserBehaviour
+                {
+                    employee_department = GetString(headers, values, "employee_department"),
+                    employee_campus = GetString(headers, values, "employee_campus"),
+                    employee_position = GetString(headers, values, "employee_position"),
+                    employee_origin_country = GetString(headers, values, "employee_origin_country"),
+                    employee_seniority_years = GetFloat(headers, values, "employee_seniority_years"),
+                    is_contractor = GetFloat(headers, values, "is_contractor"),
+                    employee_classification = GetFloat(headers, values, "employee_classification"),
+                    has_foreign_citizenship = GetFloat(headers, values, "has_foreign_citizenship"),
+                    has_criminal_record = GetFloat(headers, values, "has_criminal_record"),
+                    has_medical_history = GetFloat(headers, values, "has_medical_history"),
+                    total_printed_pages = GetFloat(headers, values, "total_printed_pages"),
+                    num_printed_pages_off_hours = GetFloat(headers, values, "num_printed_pages_off_hours"),
+                    total_files_burned = GetFloat(headers, values, "total_files_burned"),
+                    burned_from_other = GetFloat(headers, values, "burned_from_other"),
+                    is_abroad = GetFloat(headers, values, "is_abroad"),
+                    trip_day_number = GetFloat(headers, values, "trip_day_number"),
+                    hostility_country_level = GetFloat(headers, values, "hostility_country_level"),
+                    num_entries = GetFloat(headers, values, "num_entries"),
+                    num_unique_campus = GetFloat(headers, values, "num_unique_campus"),
+                    late_exit_flag = GetFloat(headers, values, "late_exit_flag"),
+                    entry_during_weekend = GetFloat(headers, values, "entry_during_weekend"),
+                    is_malicious = 0
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private string GetString(string[] headers, string[] values, string colName)
+        {
+            int idx = Array.FindIndex(headers, h => h.Trim().Equals(colName, StringComparison.OrdinalIgnoreCase));
+            return (idx >= 0 && idx < values.Length) ? values[idx] : string.Empty;
+        }
+
+        private float GetFloat(string[] headers, string[] values, string colName)
+        {
+            int idx = Array.FindIndex(headers, h => h.Trim().Equals(colName, StringComparison.OrdinalIgnoreCase));
+            if (idx < 0 || idx >= values.Length) return 0f;
+            return float.TryParse(values[idx], NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : 0f;
         }
     }
 }
