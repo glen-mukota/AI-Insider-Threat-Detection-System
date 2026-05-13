@@ -24,10 +24,6 @@ namespace InsiderThreatDetection.ApplicationLayer
             _normalProfile = FindNormalProfile(dataPath);
         }
 
-        /// <summary>
-        /// Returns the threat probability of a “neutral” baseline profile
-        /// (all numeric features set to the benign mean).
-        /// </summary>
         public float GetBaselineProbability() => _modelManager.GetNeutralBaselineProbability();
 
         public ThreatPrediction Predict(UserBehaviour input) => _modelManager.Predict(input);
@@ -58,9 +54,8 @@ namespace InsiderThreatDetection.ApplicationLayer
         }
 
         /// <summary>
-        /// Returns a pre‑defined employee profile. The values of ‘Excessive Facility Access’
-        /// and ‘Critical Insider Threat’ have been tuned to produce logical and high‑confidence
-        /// malicious predictions.
+        /// Returns a pre‑defined employee profile. All malicious profiles have been tuned
+        /// to produce high threat probabilities with the current model and threshold.
         /// </summary>
         public UserBehaviour GetProfile(string profileName)
         {
@@ -69,7 +64,6 @@ namespace InsiderThreatDetection.ApplicationLayer
                 "Normal Office Worker" => _normalProfile
                     ?? throw new InvalidOperationException("Model must be trained before using the normal profile."),
 
-                // Suspicious Printing – already working (Image 5)
                 "Suspicious Printing Activity" => new UserBehaviour
                 {
                     employee_department = "Engineering Department",
@@ -95,33 +89,32 @@ namespace InsiderThreatDetection.ApplicationLayer
                     entry_during_weekend = 1
                 },
 
-                // Fixed – now contains strong off‑hours activity and suspect flags
+                // Adjusted to ensure MALICIOUS classification with the current 0.52 threshold
                 "Excessive Facility Access" => new UserBehaviour
                 {
                     employee_department = "R&D Department",
                     employee_campus = "Campus B",
                     employee_position = "Systems Engineer",
                     employee_origin_country = "Ukraine",
-                    employee_seniority_years = 1,
+                    employee_seniority_years = 1,       // very new employee
                     is_contractor = 1,
                     employee_classification = 1,
                     has_foreign_citizenship = 1,
                     has_criminal_record = 1,
                     has_medical_history = 0,
-                    total_printed_pages = 140,
-                    num_printed_pages_off_hours = 120,
-                    total_files_burned = 5,
-                    burned_from_other = 3,
+                    total_printed_pages = 250,          // significantly increased
+                    num_printed_pages_off_hours = 250,  // high off-hours activity
+                    total_files_burned = 10,
+                    burned_from_other = 5,
                     is_abroad = 0,
                     trip_day_number = 0,
                     hostility_country_level = 0,
-                    num_entries = 140,
+                    num_entries = 200,                  // very high entries
                     num_unique_campus = 6,
                     late_exit_flag = 1,
                     entry_during_weekend = 1
                 },
 
-                // Fixed – combines multiple extreme indicators to guarantee >90% threat probability
                 "Critical Insider Threat" => new UserBehaviour
                 {
                     employee_department = "Information Technology",

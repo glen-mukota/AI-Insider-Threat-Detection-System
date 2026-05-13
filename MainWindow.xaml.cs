@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -43,20 +44,26 @@ namespace InsiderThreatDetection
 
         private async Task TrainModelAsync()
         {
+            // Clear both display panels when retraining or uploading a new dataset
+            PredictionResultText.Text = "Awaiting new prediction...";
+            EvaluationSummaryText.Text = "Training, please wait...";
+
             try
             {
                 ModelStatusText.Text = "Training, please wait...";
                 await Task.Run(() => _controller.TrainModel(_lastDatasetPath));
                 _modelReady = true;
                 ModelStatusText.Text = "Model: FastTree (selected via F1 comparison). Trained successfully ✔";
+
+                // Show evaluation summary inline (no dialog)
                 string summary = _controller.GetEvaluationSummary();
-                MessageBox.Show(summary, "Model Evaluation & Comparison");
+                EvaluationSummaryText.Text = summary;
             }
             catch (Exception ex)
             {
                 _modelReady = false;
                 ModelStatusText.Text = "Training failed.";
-                MessageBox.Show(ex.Message, "Error");
+                EvaluationSummaryText.Text = $"Training error: {ex.Message}";
             }
         }
 
@@ -74,6 +81,7 @@ namespace InsiderThreatDetection
         private void SampleProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_modelReady || SampleProfileComboBox.SelectedIndex <= 0) return;
+
             var item = (ComboBoxItem)SampleProfileComboBox.SelectedItem;
             string profile = item.Content.ToString();
             try
@@ -87,22 +95,42 @@ namespace InsiderThreatDetection
         private void PredictFromCsvButton_Click(object sender, RoutedEventArgs e)
         {
             if (!_modelReady) { MessageBox.Show("Model not trained. Please train first."); return; }
+
+            // Clear the prediction result area before starting (evaluation remains)
+            PredictionResultText.Text = "Running prediction...";
+
             var dlg = new OpenFileDialog { Title = "Select CSV with a single behavioural record", Filter = "CSV Files (*.csv)|*.csv" };
             if (dlg.ShowDialog() == true)
             {
                 try
                 {
                     var input = _controller.LoadSingleRowFromCsv(dlg.FileName, 1);
-                    PredictAndExplain(input, "CSV Record");
+                    string featureSummary = GetFeatureSummary(input);
+                    PredictAndExplain(input, "CSV Record\n\n" + featureSummary);
                 }
                 catch (Exception ex) { MessageBox.Show($"Error reading CSV: {ex.Message}"); }
             }
+            else
+            {
+                // User cancelled file selection
+                PredictionResultText.Text = "No file selected.";
+            }
+        }
+
+        private string GetFeatureSummary(UserBehaviour user)
+        {
+            return "Uploaded record key features:\n" +
+                $"  employee_seniority_years = {user.employee_seniority_years}\n" +
+                $"  is_contractor = {user.is_contractor}\n" +
+                $"  total_printed_pages = {user.total_printed_pages}\n" +
+                $"  num_printed_pages_off_hours = {user.num_printed_pages_off_hours}\n" +
+                $"  num_entries = {user.num_entries}\n" +
+                $"  late_exit_flag = {user.late_exit_flag}\n" +
+                $"  entry_during_weekend = {user.entry_during_weekend}";
         }
 
         /// <summary>
-        /// Runs prediction, compiles the explanation, and displays it.
-        /// Risk level is tied to classification, not raw probability alone,
-        /// to avoid contradictory labels (e.g. MEDIUM RISK on a NORMAL classification).
+        /// Updates the prediction result panel and auto‑scrolls to make it visible.
         /// </summary>
         private void PredictAndExplain(UserBehaviour input, string sourceDescription)
         {
@@ -111,11 +139,9 @@ namespace InsiderThreatDetection
                 var prediction = _controller.Predict(input);
                 string classification = prediction.PredictedLabel ? "MALICIOUS" : "NORMAL";
 
-                // ---- Risk level tied to classification ----
                 string riskLevel;
                 if (classification == "NORMAL")
                 {
-                    // Residual concern for near‑threshold normal records
                     riskLevel = prediction.Probability switch
                     {
                         < 0.30f => "LOW RISK",
@@ -133,14 +159,12 @@ namespace InsiderThreatDetection
                     };
                 }
 
-                // Confidence: probability for MALICIOUS, 1‑probability for NORMAL
                 float displayConfidence = prediction.PredictedLabel
                     ? prediction.Probability
                     : 1f - prediction.Probability;
 
                 string humanExplanation = _controller.GenerateHumanExplanation(input, prediction);
 
-                // Feature contributions with base probability line
                 var contributions = _controller.Explain(input);
                 float baseProb = _controller.GetBaselineProbability();
                 string featureRanking = "\nFeature Importance (most → least influential):\n";
@@ -154,18 +178,23 @@ namespace InsiderThreatDetection
                     featureRanking += $"  - {c.Feature}: {c.Value} ({dir} risk by {Math.Abs(c.Contribution):F3})\n";
                 }
 
-                string message =
-                    $"** Profile tested: {sourceDescription} **\n\n" +
-                    $"Classification: {classification}\n" +
-                    $"Threat Probability: {prediction.Probability:P2}\n" +
-                    $"Confidence in prediction: {displayConfidence:P2}\n" +
-                    $"Risk level: {riskLevel}\n\n" +
-                    $"Explanation:\n{humanExplanation}\n" +
-                    featureRanking;
+                string result = $"** Profile tested: {sourceDescription} **\n\n" +
+                                $"Classification: {classification}\n" +
+                                $"Threat Probability: {prediction.Probability:P2}\n" +
+                                $"Confidence in prediction: {displayConfidence:P2}\n" +
+                                $"Risk level: {riskLevel}\n\n" +
+                                $"Explanation:\n{humanExplanation}\n" +
+                                featureRanking;
 
-                MessageBox.Show(message, "Prediction Result");
+                PredictionResultText.Text = result;
+
+                // Auto‑scroll so the full result is visible
+                MainScrollViewer.ScrollToEnd();
             }
-            catch (Exception ex) { MessageBox.Show($"Prediction failed: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                PredictionResultText.Text = $"Prediction failed: {ex.Message}";
+            }
         }
     }
 }

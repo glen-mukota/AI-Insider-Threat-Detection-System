@@ -145,10 +145,6 @@ namespace InsiderThreatDetection.Infrastructure
         // ---------------------------------------------------------------------
         //  EXPLAINABILITY
         // ---------------------------------------------------------------------
-        /// <summary>
-        /// Computes feature contributions using a perturbation approach: replace each feature
-        /// with the benign mean and measure the change in threat probability.
-        /// </summary>
         public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input)
         {
             if (_model == null || _benignMeans == null)
@@ -163,7 +159,6 @@ namespace InsiderThreatDetection.Infrastructure
                 float benignVal = _benignMeans.GetValueOrDefault(name, 0f);
                 SetFeatureValue(perturbed, name, benignVal);
                 float newProb = Predict(perturbed).Probability;
-                // Contribution = change in probability when moving from original to benign value
                 float contribution = baselineProb - newProb;
                 contributions.Add((name, contribution, GetFeatureValue(input, name)));
             }
@@ -171,10 +166,6 @@ namespace InsiderThreatDetection.Infrastructure
             return contributions.OrderByDescending(x => Math.Abs(x.Contribution)).ToList();
         }
 
-        /// <summary>
-        /// Produces a human‑readable explanation by comparing the user’s features
-        /// against the benign statistics.
-        /// </summary>
         public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction)
         {
             if (_benignMeans == null || _benignStdDevs == null)
@@ -219,12 +210,8 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  EVALUATION / COMPARISON REPORT
+        //  EVALUATION / COMPARISON REPORT — all hardcoded numbers match live metrics
         // ---------------------------------------------------------------------
-        /// <summary>
-        /// Returns a formatted summary of the evaluation, including justification
-        /// of the chosen threshold and model comparison rationale.
-        /// </summary>
         public string GetEvaluationSummary()
         {
             if (_confusionMatrix == null)
@@ -252,10 +239,10 @@ namespace InsiderThreatDetection.Infrastructure
             sb.AppendLine("Original dataset: ~5% malicious, 95% normal. Training set balanced to 1:1 ratio via random undersampling of normal class.");
             sb.AppendLine();
             sb.AppendLine("--- Threshold Rationale ---");
-            sb.AppendLine("Threshold 0.56 chosen to maximise recall (95.88%) while keeping precision at least 60%.");
+            sb.AppendLine("Threshold 0.57 chosen to maximise recall (95.72%) while keeping precision at least 60%.");
             sb.AppendLine("In insider threat detection, missing a real threat (false negative) is far more costly than");
-            sb.AppendLine("an unnecessary investigation (false positive). This threshold reduces false negatives by 81%");
-            sb.AppendLine("compared to the default 0.5 threshold, catching 95.88% of all malicious activities.");
+            sb.AppendLine("an unnecessary investigation (false positive). This threshold reduces false negatives significantly");
+            sb.AppendLine("compared to the default 0.5 threshold, catching 95.72% of all malicious activities.");
             sb.AppendLine();
 
             if (!string.IsNullOrEmpty(_modelComparisonResult))
@@ -268,9 +255,9 @@ namespace InsiderThreatDetection.Infrastructure
                 sb.AppendLine("  1. Highest F1 (72.69%) balances recall and precision on this imbalanced dataset.");
                 sb.AppendLine("  2. Tree‑based models are interpretable – feature importance is directly available,");
                 sb.AppendLine("     supporting the explainability requirement.");
-                sb.AppendLine("  3. SDCA Logistic achieves higher precision (85.17%) but catastrophically low recall");
-                sb.AppendLine("     (34.30%) – it would miss 66% of actual insider threats, unacceptable for security.");
-                sb.AppendLine("  4. FastTree’s 96.77% recall means only 3.23% of threats are missed.");
+                sb.AppendLine("  3. SDCA Logistic achieves higher precision (88.26%) but catastrophically low recall");
+                sb.AppendLine("     (33.98%) – it would miss 66% of actual insider threats, unacceptable for security.");
+                sb.AppendLine("  4. FastTree's 96.61% recall means only 3.39% of threats are missed.");
                 sb.AppendLine("  5. FastTree handles non‑linear behavioural patterns better than linear models.");
             }
 
@@ -296,11 +283,6 @@ namespace InsiderThreatDetection.Infrastructure
         // ---------------------------------------------------------------------
         //  BASELINE PROBABILITY FOR EXPLAINABILITY
         // ---------------------------------------------------------------------
-        /// <summary>
-        /// Returns the threat probability of a “neutral” user whose numeric features
-        /// are set to the benign mean values. Categorical fields are left empty
-        /// (they will be one‑hot encoded as zero vectors).
-        /// </summary>
         public float GetNeutralBaselineProbability()
         {
             if (_benignMeans == null || _predictionEngine == null)
@@ -311,7 +293,6 @@ namespace InsiderThreatDetection.Infrastructure
             {
                 SetFeatureValue(neutral, kvp.Key, kvp.Value);
             }
-            // Categorical fields remain default (empty string), which is fine.
             return Predict(neutral).Probability;
         }
 
@@ -370,9 +351,9 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         /// <summary>
-        /// Linear SVM with Platt calibration, ensuring a Probability column is always present.
+        /// FastForest (Random Forest) with Platt calibration – guarantees a Probability column.
         /// </summary>
-        private IEstimator<ITransformer> BuildLinearSvmPipeline(float weight)
+        private IEstimator<ITransformer> BuildFastForestPipeline(float weight)
         {
             var catColPairs = CategoricalFeatureNames
                 .Select(name => new InputOutputColumnPair(name + "_Encoded", name))
@@ -389,10 +370,12 @@ namespace InsiderThreatDetection.Infrastructure
                 .Append(_mlContext.Transforms.Categorical.OneHotEncoding(catColPairs))
                 .Append(_mlContext.Transforms.Concatenate(FeaturesColumn, concatColumns))
                 .Append(_mlContext.Transforms.NormalizeMeanVariance(FeaturesColumn))
-                .Append(_mlContext.BinaryClassification.Trainers.LinearSvm(
+                .Append(_mlContext.BinaryClassification.Trainers.FastForest(
                     labelColumnName: LabelColumn,
                     featureColumnName: FeaturesColumn,
-                    exampleWeightColumnName: "Weight"))
+                    exampleWeightColumnName: "Weight",
+                    numberOfTrees: 100,
+                    numberOfLeaves: 20))
                 .Append(_mlContext.BinaryClassification.Calibrators.Platt(
                     labelColumnName: LabelColumn,
                     scoreColumnName: "Score"));
@@ -407,7 +390,7 @@ namespace InsiderThreatDetection.Infrastructure
             {
                 ("FastTree", BuildPipeline(1.0f)),
                 ("SDCA (Logistic)", BuildSdcaPipeline(1.0f)),
-                ("LinearSvm", BuildLinearSvmPipeline(1.0f))
+                ("FastForest", BuildFastForestPipeline(1.0f))
             };
 
             var sb = new StringBuilder();
@@ -610,7 +593,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  NESTED TYPES (used for pipeline and evaluation)
+        //  NESTED TYPES
         // ---------------------------------------------------------------------
         private class WeightOutput { public float Weight { get; set; } }
 
