@@ -1,16 +1,24 @@
 ﻿<Window x:Class="InsiderThreatDetection.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI‑Powered Insider Threat Detection" Height="850" Width="550"
-        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
-        Background="#F4F6F8">
-    <ScrollViewer x:Name="MainScrollViewer" VerticalScrollBarVisibility="Auto">
-        <Grid Margin="25">
+        Title="AI-Powered Insider Threat Detection System"
+        Height="980"
+        Width="700"
+        WindowStartupLocation="CenterScreen"
+        Background="#0D1117"
+        ResizeMode="CanResize">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="20">
+
+            <!-- ROWS -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="20"/>
+                <RowDefinition Height="15"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="25"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="15"/>
                 <RowDefinition Height="Auto"/>
@@ -22,73 +30,296 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Title -->
-            <TextBlock Grid.Row="0" Text="AI‑Powered Insider Threat Detection"
-                       FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"
-                       Foreground="#2C3E50"/>
+            <!-- HEADER -->
+            <Border Grid.Row="0"
+                    Background="#161B22"
+                    CornerRadius="12"
+                    Padding="20"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
 
-            <!-- Training / Upload controls -->
-            <StackPanel Grid.Row="2">
-                <Button x:Name="UploadCsvButton" Content="Upload Training Dataset (*.csv)"
-                        Height="40" FontWeight="SemiBold" Background="#2E86C1" Foreground="White"
-                        Click="UploadCsvButton_Click"/>
-                <Button x:Name="TrainModelButton" Content="Retrain Model"
-                        Height="36" Margin="0,8,0,0" Background="#5DADE2" Foreground="White"
-                        Click="TrainModelButton_Click"/>
-                <Button x:Name="SaveModelButton" Content="Save Trained Model (.zip)"
-                        Height="30" Margin="0,8,0,0" Background="#A569BD" Foreground="White"
-                        Click="SaveModelButton_Click"/>
-                <TextBlock x:Name="ModelStatusText" Margin="0,12,0,0" FontWeight="SemiBold"
-                           Foreground="#C0392B" Text="Model not trained."/>
-            </StackPanel>
-
-            <!-- Sample profile selection -->
-            <Border Grid.Row="4" Padding="15" Background="White" CornerRadius="6"
-                    BorderBrush="#D5D8DC" BorderThickness="1">
                 <StackPanel>
-                    <TextBlock Text="Select Sample Employee Profile" FontWeight="Bold"
-                               Margin="0,0,0,12" Foreground="#2C3E50"/>
-                    <ComboBox x:Name="SampleProfileComboBox" Height="30"
+
+                    <TextBlock Text="AI Insider Threat Detection System"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="#E6EDF3"
+                               HorizontalAlignment="Center"/>
+
+                    <TextBlock Text="COS720 Project 2026"
+                               FontSize="14"
+                               Foreground="#8B949E"
+                               HorizontalAlignment="Center"
+                               Margin="0,5,0,15"/>
+
+                    <WrapPanel HorizontalAlignment="Center">
+
+                        <Border Background="#1F6FEB"
+                                CornerRadius="8"
+                                Padding="8,4"
+                                Margin="4">
+                            <TextBlock Text="CONFIDENTIALITY"
+                                       Foreground="White"
+                                       FontWeight="Bold"/>
+                        </Border>
+
+                        <Border Background="#3FB950"
+                                CornerRadius="8"
+                                Padding="8,4"
+                                Margin="4">
+                            <TextBlock Text="INTEGRITY"
+                                       Foreground="White"
+                                       FontWeight="Bold"/>
+                        </Border>
+
+                        <Border Background="#D29922"
+                                CornerRadius="8"
+                                Padding="8,4"
+                                Margin="4">
+                            <TextBlock Text="AVAILABILITY"
+                                       Foreground="White"
+                                       FontWeight="Bold"/>
+                        </Border>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- MODEL STATUS -->
+            <Border Grid.Row="2"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
+                <StackPanel Orientation="Horizontal">
+
+                    <Ellipse x:Name="StatusDot"
+                             Width="14"
+                             Height="14"
+                             Fill="#F85149"
+                             Margin="0,3,10,0"/>
+
+                    <TextBlock x:Name="ModelStatusText"
+                               Text="Model not trained."
+                               Foreground="#8B949E"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- TRAINING -->
+            <Border Grid.Row="4"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
+                <StackPanel>
+
+                    <TextBlock Text="1. Model Training &amp; Management"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#E6EDF3"
+                               Margin="0,0,0,12"/>
+
+                    <Button x:Name="UploadCsvButton"
+                            Content="Upload Training Dataset (.csv)"
+                            Height="42"
+                            Background="#1F6FEB"
+                            Foreground="White"
+                            Click="UploadCsvButton_Click"/>
+
+                    <Button x:Name="RetrainModelButton"
+                            Content="Retrain Model"
+                            Height="38"
+                            Margin="0,8,0,0"
+                            Background="#238636"
+                            Foreground="White"
+                            Click="RetrainModelButton_Click"/>
+
+                    <Button x:Name="SaveModelButton"
+                            Content="Save Trained Model"
+                            Height="38"
+                            Margin="0,8,0,0"
+                            Background="#8957E5"
+                            Foreground="White"
+                            Click="SaveModelButton_Click"/>
+
+                    <Button x:Name="LoadModelButton"
+                            Content="Load Existing Model"
+                            Height="38"
+                            Margin="0,8,0,0"
+                            Background="#D29922"
+                            Foreground="White"
+                            Click="LoadModelButton_Click"/>
+                </StackPanel>
+            </Border>
+
+            <!-- PREPROCESSING -->
+            <Border x:Name="PreprocessingPanel"
+                    Grid.Row="6"
+                    Visibility="Collapsed"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Dataset Preprocessing Summary"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="#E6EDF3"
+                               Margin="0,0,0,8"/>
+
+                    <TextBlock x:Name="PreprocessingText"
+                               TextWrapping="Wrap"
+                               Foreground="#8B949E"/>
+                </StackPanel>
+            </Border>
+
+            <!-- PREDICTION -->
+            <Border Grid.Row="8"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
+                <StackPanel>
+
+                    <TextBlock Text="2. Threat Prediction"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#E6EDF3"
+                               Margin="0,0,0,12"/>
+
+                    <ComboBox x:Name="SampleProfileComboBox"
+                              Height="35"
                               SelectionChanged="SampleProfileComboBox_SelectionChanged">
-                        <ComboBoxItem Content="-- Select Profile --"/>
+                        <ComboBoxItem Content="-- Select Sample Profile --"/>
                         <ComboBoxItem Content="Normal Office Worker"/>
                         <ComboBoxItem Content="Suspicious Printing Activity"/>
                         <ComboBoxItem Content="Excessive Facility Access"/>
                         <ComboBoxItem Content="Critical Insider Threat"/>
                     </ComboBox>
-                    <TextBlock Margin="0,12,0,0" TextWrapping="Wrap"
-                               Text="Selecting a profile automatically runs prediction."
-                               FontStyle="Italic" Foreground="#7F8C8D"/>
+
+                    <Button x:Name="PredictFromCsvButton"
+                            Content="Upload Single CSV Record &amp; Predict"
+                            Height="38"
+                            Margin="0,10,0,0"
+                            Background="#BC4C00"
+                            Foreground="White"
+                            Click="PredictFromCsvButton_Click"/>
+
+                    <TextBlock x:Name="ThresholdBadge"
+                               Visibility="Collapsed"
+                               Margin="0,12,0,0"
+                               Foreground="#58A6FF"
+                               FontWeight="Bold"/>
                 </StackPanel>
             </Border>
 
-            <!-- Upload CSV & Predict -->
-            <Button Grid.Row="6" x:Name="PredictFromCsvButton"
-                    Content="Upload Single CSV Record &amp; Predict"
-                    Height="40" FontWeight="SemiBold" Background="#8E44AD" Foreground="White"
-                    Click="PredictFromCsvButton_Click"/>
+            <!-- RISK VISUAL -->
+            <StackPanel Grid.Row="10">
 
-            <!-- Prediction result panel (always visible) -->
-            <Border Grid.Row="8" Padding="15" Background="White" CornerRadius="6"
-                    BorderBrush="#D5D8DC" BorderThickness="1" Margin="0,10,0,0">
+                <Border x:Name="ClassificationBar"
+                        Height="28"
+                        Background="#30363D"
+                        CornerRadius="8"
+                        Visibility="Collapsed">
+
+                    <Grid>
+                        <Border x:Name="ClassificationFill"
+                                HorizontalAlignment="Left"
+                                Background="#3FB950"
+                                CornerRadius="8"/>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="RiskBadge"
+                        Visibility="Collapsed"
+                        Background="#F85149"
+                        Padding="10,5"
+                        Margin="0,8,0,0"
+                        CornerRadius="8"
+                        HorizontalAlignment="Left">
+
+                    <TextBlock x:Name="RiskBadgeText"
+                               Foreground="White"
+                               FontWeight="Bold"/>
+                </Border>
+            </StackPanel>
+
+            <!-- RESULTS -->
+            <Border Grid.Row="12"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
                 <StackPanel>
-                    <TextBlock Text="Prediction Result" FontWeight="Bold"
-                               Foreground="#2C3E50" Margin="0,0,0,10"/>
-                    <TextBlock x:Name="PredictionResultText" TextWrapping="Wrap"
-                               FontFamily="Consolas" FontSize="12"
-                               Text="No prediction run yet." />
+
+                    <TextBlock Text="Prediction &amp; Evaluation Results"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#E6EDF3"
+                               Margin="0,0,0,12"/>
+
+                    <TextBlock x:Name="PredictionResultText"
+                               Text="Awaiting prediction..."
+                               TextWrapping="Wrap"
+                               FontFamily="Consolas"
+                               Foreground="#E6EDF3"
+                               Margin="0,0,0,15"/>
+
+                    <TextBlock x:Name="EvaluationSummaryText"
+                               Text="No evaluation available yet."
+                               TextWrapping="Wrap"
+                               FontFamily="Consolas"
+                               Foreground="#8B949E"/>
                 </StackPanel>
             </Border>
 
-            <!-- Model Evaluation & Comparison panel (always visible after training) -->
-            <Border Grid.Row="10" Padding="15" Background="White" CornerRadius="6"
-                    BorderBrush="#D5D8DC" BorderThickness="1" Margin="0,10,0,0">
+            <!-- AUDIT LOG -->
+            <Border Grid.Row="14"
+                    Margin="0,15,0,0"
+                    Background="#161B22"
+                    CornerRadius="10"
+                    Padding="15"
+                    BorderBrush="#30363D"
+                    BorderThickness="1">
+
                 <StackPanel>
-                    <TextBlock Text="Model Evaluation &amp; Comparison" FontWeight="Bold"
-                               Foreground="#2C3E50" Margin="0,0,0,10"/>
-                    <TextBlock x:Name="EvaluationSummaryText" TextWrapping="Wrap"
-                               FontFamily="Consolas" FontSize="12"
-                               Text="No model trained yet." />
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Audit Log"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#E6EDF3"/>
+
+                        <Button x:Name="RefreshAuditBtn"
+                                Content="Refresh"
+                                Margin="15,0,0,0"
+                                Padding="10,3"
+                                Click="RefreshAuditBtn_Click"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="AuditLogPathText"
+                               Margin="0,8,0,8"
+                               Foreground="#8B949E"/>
+
+                    <TextBox x:Name="AuditLogText"
+                             Height="180"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Background="#0D1117"
+                             Foreground="#C9D1D9"
+                             FontFamily="Consolas"/>
                 </StackPanel>
             </Border>
 
