@@ -1,0 +1,304 @@
+﻿<Window x:Class="InsiderThreatDetection.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI Insider Threat Detection Dashboard"
+        Width="1600"
+        Height="950"
+        MinWidth="1400"
+        MinHeight="850"
+        WindowStartupLocation="CenterScreen"
+        Background="#0D1117"
+        ResizeMode="CanResize">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- SIDEBAR -->
+        <Border Grid.Column="0"
+                Background="#090C10"
+                BorderBrush="#1F2937"
+                BorderThickness="0,0,1,0">
+
+            <StackPanel Margin="18">
+
+                <TextBlock Text="ThreatGuard AI"
+                           FontSize="28"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           Margin="0,20,0,35"/>
+
+                <TextBlock Text="SECURITY MODULES"
+                           Foreground="#8B949E"
+                           FontSize="12"
+                           Margin="0,0,0,12"/>
+
+                <Button Content="Dashboard"
+                        Height="42"
+                        Margin="0,4"
+                        Background="#1F6FEB"
+                        Foreground="White"/>
+
+                <Button Content="Model Training"
+                        Height="42"
+                        Margin="0,4"
+                        Background="#161B22"
+                        Foreground="White"/>
+
+                <Button Content="Prediction Engine"
+                        Height="42"
+                        Margin="0,4"
+                        Background="#161B22"
+                        Foreground="White"/>
+
+                <Button Content="Audit Logs"
+                        Height="42"
+                        Margin="0,4"
+                        Background="#161B22"
+                        Foreground="White"/>
+
+                <Separator Margin="0,25"/>
+
+                <TextBlock Text="CIA SECURITY"
+                           Foreground="#8B949E"
+                           FontSize="12"
+                           Margin="0,0,0,10"/>
+
+                <WrapPanel>
+                    <Border Background="#1F6FEB" CornerRadius="6" Padding="10,5" Margin="3">
+                        <TextBlock Text="CONF" Foreground="White"/>
+                    </Border>
+
+                    <Border Background="#3FB950" CornerRadius="6" Padding="10,5" Margin="3">
+                        <TextBlock Text="INT" Foreground="White"/>
+                    </Border>
+
+                    <Border Background="#D29922" CornerRadius="6" Padding="10,5" Margin="3">
+                        <TextBlock Text="AVAIL" Foreground="White"/>
+                    </Border>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- MAIN CONTENT -->
+        <ScrollViewer Grid.Column="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+
+            <StackPanel Margin="20">
+
+                <!-- HEADER -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="380"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="AI Insider Threat Detection Dashboard"
+                                   FontSize="34"
+                                   FontWeight="Bold"
+                                   Foreground="White"/>
+
+                        <TextBlock Text="COS720 Project 2026"
+                                   Foreground="#8B949E"/>
+                    </StackPanel>
+
+                    <Border Grid.Column="1"
+                            Background="#161B22"
+                            CornerRadius="10"
+                            Padding="15"
+                            HorizontalAlignment="Right">
+
+                        <DockPanel>
+                            <Ellipse x:Name="StatusDot"
+                                     Width="14"
+                                     Height="14"
+                                     Fill="#F85149"
+                                     Margin="0,0,10,0"/>
+
+                            <TextBlock x:Name="ModelStatusText"
+                                       Text="Model not trained."
+                                       Foreground="White"
+                                       Width="300"
+                                       TextWrapping="Wrap"/>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
+                <!-- TOP SECTION -->
+                <UniformGrid Columns="3" Margin="0,0,0,20">
+
+                    <!-- TRAINING -->
+                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
+                        <StackPanel>
+                            <TextBlock Text="Model Training"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+
+                            <Button x:Name="UploadCsvButton"
+                                    Content="Upload Dataset"
+                                    Height="42"
+                                    Margin="0,15,0,8"
+                                    Background="#1F6FEB"
+                                    Foreground="White"
+                                    Click="UploadCsvButton_Click"/>
+
+                            <Button x:Name="RetrainModelButton"
+                                    Content="Retrain Model"
+                                    Height="42"
+                                    Margin="0,0,0,8"
+                                    Background="#238636"
+                                    Foreground="White"
+                                    Click="RetrainModelButton_Click"/>
+
+                            <Button x:Name="SaveModelButton"
+                                    Content="Save Model"
+                                    Height="42"
+                                    Background="#8957E5"
+                                    Foreground="White"
+                                    Click="SaveModelButton_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- PREDICTION -->
+                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
+                        <StackPanel>
+                            <TextBlock Text="Prediction Engine"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+
+                            <ComboBox x:Name="SampleProfileComboBox"
+                                      Height="40"
+                                      Margin="0,15,0,8"
+                                      SelectionChanged="SampleProfileComboBox_SelectionChanged"/>
+
+                            <Button x:Name="PredictFromCsvButton"
+                                    Content="Upload CSV &amp; Predict"
+                                    Height="42"
+                                    Background="#BC4C00"
+                                    Foreground="White"
+                                    Click="PredictFromCsvButton_Click"/>
+
+                            <TextBlock x:Name="ThresholdBadge"
+                                       Margin="0,10,0,0"
+                                       Foreground="#58A6FF"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- MODEL MGMT -->
+                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
+                        <StackPanel>
+                            <TextBlock Text="Model Management"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+
+                            <Button x:Name="LoadModelButton"
+                                    Content="Load Existing Model"
+                                    Height="42"
+                                    Margin="0,15,0,8"
+                                    Background="#D29922"
+                                    Foreground="White"
+                                    Click="LoadModelButton_Click"/>
+
+                            <Border x:Name="RiskBadge"
+                                    Visibility="Collapsed"
+                                    Background="#F85149"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="0,12,0,0">
+                                <TextBlock x:Name="RiskBadgeText"
+                                           Foreground="White"
+                                           FontWeight="Bold"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                </UniformGrid>
+
+                <!-- RESULTS -->
+                <Border Background="#161B22"
+                        CornerRadius="12"
+                        Padding="20"
+                        Margin="0,0,0,20">
+
+                    <StackPanel>
+                        <TextBlock Text="Prediction &amp; Evaluation Results"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="White"/>
+
+                        <Border x:Name="ClassificationBar"
+                                Height="24"
+                                Background="#30363D"
+                                Margin="0,15,0,10"
+                                CornerRadius="8"
+                                Visibility="Collapsed">
+
+                            <Grid>
+                                <Border x:Name="ClassificationFill"
+                                        HorizontalAlignment="Left"
+                                        CornerRadius="8"
+                                        Background="#3FB950"/>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock x:Name="PredictionResultText"
+                                   Text="Awaiting prediction..."
+                                   FontFamily="Consolas"
+                                   Foreground="White"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8"/>
+
+                        <TextBlock x:Name="EvaluationSummaryText"
+                                   Text="No evaluation available yet."
+                                   FontFamily="Consolas"
+                                   Foreground="#8B949E"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- AUDIT -->
+                <Border Background="#161B22"
+                        CornerRadius="12"
+                        Padding="20">
+
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock Text="Audit Logs"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+
+                            <Button x:Name="RefreshAuditBtn"
+                                    Content="Refresh"
+                                    Width="100"
+                                    HorizontalAlignment="Right"
+                                    Click="RefreshAuditBtn_Click"/>
+                        </DockPanel>
+
+                        <TextBlock x:Name="AuditLogPathText"
+                                   Foreground="#8B949E"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBox x:Name="AuditLogText"
+                                 Height="250"
+                                 IsReadOnly="True"
+                                 Background="#0D1117"
+                                 Foreground="#C9D1D9"
+                                 FontFamily="Consolas"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
