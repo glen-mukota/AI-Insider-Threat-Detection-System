@@ -1,0 +1,57 @@
+﻿{
+  "OptimalThreshold": 0.83,
+  "Accuracy": 0.9727473086377892,
+  "Precision": 0.6973509933774834,
+  "Recall": 0.8498789346246973,
+  "F1Score": 0.766096762459076,
+  "ConfusionMatrix": [
+    [
+      21898,
+      457
+    ],
+    [
+      186,
+      1053
+    ]
+  ],
+  "BenignMeans": {
+    "employee_seniority_years": 12.316495,
+    "is_contractor": 0.13794443,
+    "employee_classification": 1.885953,
+    "has_foreign_citizenship": 0.15815037,
+    "has_criminal_record": 0.05284632,
+    "has_medical_history": 0.1480474,
+    "total_printed_pages": 12.688168,
+    "num_printed_pages_off_hours": 0.34583253,
+    "total_files_burned": 7.286769,
+    "burned_from_other": 0.00038857586,
+    "is_abroad": 0.042743344,
+    "trip_day_number": 0.21216242,
+    "hostility_country_level": 0.003302895,
+    "num_entries": 0.7252769,
+    "num_unique_campus": 0.5747037,
+    "late_exit_flag": 0,
+    "entry_during_weekend": 0.047794834
+  },
+  "BenignStdDevs": {
+    "employee_seniority_years": 7.243924,
+    "is_contractor": 0.34487513,
+    "employee_classification": 0.7519962,
+    "has_foreign_citizenship": 0.3649174,
+    "has_criminal_record": 0.22374831,
+    "has_medical_history": 0.3551815,
+    "total_printed_pages": 21.536547,
+    "num_printed_pages_off_hours": 1.6300006,
+    "total_files_burned": 14.702032,
+    "burned_from_other": 0.019710414,
+    "is_abroad": 0.20229757,
+    "trip_day_number": 1.2275436,
+    "hostility_country_level": 0.077544734,
+    "num_entries": 0.7325561,
+    "num_unique_campus": 0.5091518,
+    "late_exit_flag": 0,
+    "entry_during_weekend": 0.21335259
+  },
+  "ModelComparisonResult": "    FastTree (Selected)       : Acc=96,15%  Prec=58,06%  Rec=95,96%  F1=72,35%\r\n    SDCA Logistic Reg.        : Acc=86,78%  Prec=25,72%  Rec=80,39%  F1=38,97%\r\n    FastForest                : Acc=92,89%  Prec=40,94%  Rec=80,06%  F1=54,18%\r\n",
+  "TrainedRowCount": 10294
+}

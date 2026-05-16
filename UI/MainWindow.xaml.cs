@@ -206,12 +206,18 @@ namespace InsiderThreatDetection
                 _controller.LoadModel(dialog.FileName);
                 EvaluationSummaryText.Text =
                     "ℹ  Model loaded from file.\n\n" +
-                    "Note: Evaluation metrics from the original training session are not\n" +
-                    "available when loading a saved model. To see metrics, retrain the model\n" +
-                    "with the dataset.\n\n" +
-                    "The model is ready for predictions.";
+                    _controller.GetEvaluationSummary();
 
-                ThresholdBadge.Text = "🎯 Decision Threshold: 50%  (default – retrain to calibrate)";
+                float threshold = _controller.GetCalibratedThreshold();
+                float baseline = _controller.GetBaselineProbability();
+
+                ThresholdBadge.Text =
+                    $"🎯 Decision Threshold: {threshold:P0}  " +
+                    $"(records ≥ {threshold:P0} → MALICIOUS)";
+                BaselineBadge.Text =
+                    float.IsNaN(baseline)
+                    ? "Baseline probability: N/A — load the matching .metadata.json file for calibrated baselines."
+                    : $"Benign baseline probability: {baseline:P1}";
                 ThresholdPanel.Visibility = Visibility.Visible;
 
                 SetModelReadyState(true,
@@ -428,7 +434,8 @@ namespace InsiderThreatDetection
                     maxAbs = Math.Abs(e.Contribution);
 
             if (maxAbs == 0) maxAbs = 1;
-            const double barMax = 300.0;
+            // Keep bars inside the explanation card at the minimum supported window width.
+            const double barMax = 150.0;
 
             foreach (var e in explains)
             {

@@ -247,12 +247,14 @@ namespace InsiderThreatDetection.ApplicationLayer
                     _normalProfile
                     ?? _preprocessor.CleanSingleRecord(new UserBehaviour
                     {
-                        // Typical benign employee from the dataset
+                        // Representative benign employee from the dataset.
+                        // Kept as a stable fallback when a saved model is loaded
+                        // and the training-time normal profile is not available.
                         employee_department = "Engineering Department",
-                        employee_campus = "Campus A",
+                        employee_campus = "Campus C",
                         employee_position = "Design Engineer",
-                        employee_origin_country = "South Africa",
-                        employee_seniority_years = 8,
+                        employee_origin_country = "Georgia",
+                        employee_seniority_years = 22,
                         is_contractor = 0,
                         employee_classification = 2,
                         has_foreign_citizenship = 0,
@@ -268,7 +270,7 @@ namespace InsiderThreatDetection.ApplicationLayer
                         num_entries = 1,
                         num_unique_campus = 1,
                         late_exit_flag = 0,
-                        entry_during_weekend = 0
+                        entry_during_weekend = 1
                     }),
 
                 "Suspicious Printing Activity" => _preprocessor.CleanSingleRecord(new UserBehaviour

@@ -68,6 +68,7 @@ namespace InsiderThreatDetection.Infrastructure
 
         private string? _modelComparisonResult;
         private int _trainedRowCount;
+        private bool _modelLoadedWithoutMetadata;
 
         public float OptimalThreshold => _optimalThreshold;
         public string? LastErrorMessage { get; private set; }
@@ -85,6 +86,7 @@ namespace InsiderThreatDetection.Infrastructure
             try
             {
                 // Load cleaned CSV
+                _modelLoadedWithoutMetadata = false;
                 var data = _mlContext.Data.LoadFromTextFile<UserBehaviour>(
                     cleanedDataPath, hasHeader: true, separatorChar: ',');
                 var split = _mlContext.Data.TrainTestSplit(data,
@@ -324,8 +326,18 @@ namespace InsiderThreatDetection.Infrastructure
         public string GetEvaluationSummary()
         {
             if (_confusionMatrix == null)
+            {
+                if (_predictionEngine != null && _modelLoadedWithoutMetadata)
+                {
+                    return "Model loaded successfully, but the sidecar metadata file was not found.\n\n" +
+                           "Predictions are available using the default 50% decision threshold. " +
+                           "Evaluation metrics, calibrated threshold, and explainability baselines require " +
+                           "the matching .metadata.json file or a fresh training run.";
+                }
+
                 return LastErrorMessage
                        ?? "Model not yet trained. Please upload a dataset and train the model.";
+            }
 
             double tn = _confusionMatrix[0][0], fp = _confusionMatrix[0][1];
             double fn = _confusionMatrix[1][0], tp = _confusionMatrix[1][1];
@@ -432,6 +444,15 @@ namespace InsiderThreatDetection.Infrastructure
                 _optimalThreshold = 0.5f;
                 _benignMeans = null;
                 _benignStdDevs = null;
+                _confusionMatrix = null;
+                _modelComparisonResult = null;
+                _accuracy = _precision = _recall = _f1Score = 0;
+                _trainedRowCount = 0;
+                _modelLoadedWithoutMetadata = true;
+            }
+            else
+            {
+                _modelLoadedWithoutMetadata = false;
             }
 
             AuditLogger.Instance.LogModelLoaded(path);
