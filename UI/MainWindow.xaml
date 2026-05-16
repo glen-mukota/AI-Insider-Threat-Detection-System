@@ -1,303 +1,611 @@
-﻿<Window x:Class="InsiderThreatDetection.MainWindow"
+<Window x:Class="InsiderThreatDetection.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI Insider Threat Detection Dashboard"
+        Title="ThreatGuard AI - Insider Threat Detection"
         Width="1600"
         Height="950"
-        MinWidth="1400"
-        MinHeight="850"
+        MinWidth="1320"
+        MinHeight="820"
         WindowStartupLocation="CenterScreen"
-        Background="#0D1117"
+        Background="#0B0F14"
         ResizeMode="CanResize">
 
-    <Grid>
+    <Window.Resources>
+        <SolidColorBrush x:Key="PageBg" Color="#0B0F14"/>
+        <SolidColorBrush x:Key="PanelBg" Color="#121821"/>
+        <SolidColorBrush x:Key="PanelAltBg" Color="#18202B"/>
+        <SolidColorBrush x:Key="BorderMuted" Color="#273241"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#F3F6FA"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#9AA7B5"/>
+        <SolidColorBrush x:Key="AccentBlue" Color="#2F81F7"/>
+        <SolidColorBrush x:Key="AccentGreen" Color="#3FB950"/>
+        <SolidColorBrush x:Key="AccentOrange" Color="#D29922"/>
+        <SolidColorBrush x:Key="AccentRed" Color="#F85149"/>
+
+        <Style x:Key="NavButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderMuted}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="MicroLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+        </Style>
+
+        <Style x:Key="PanelBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBg}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderMuted}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="18"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource PageBg}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="260"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- SIDEBAR -->
         <Border Grid.Column="0"
-                Background="#090C10"
-                BorderBrush="#1F2937"
+                Background="#080C11"
+                BorderBrush="{StaticResource BorderMuted}"
                 BorderThickness="0,0,1,0">
+            <Grid Margin="18,22">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <StackPanel Margin="18">
+                <StackPanel>
+                    <TextBlock Text="ThreatGuard AI"
+                               Foreground="{StaticResource TextPrimary}"
+                               FontSize="28"
+                               FontWeight="Bold"/>
+                    <TextBlock Text="Insider Threat Detection"
+                               Foreground="{StaticResource TextSecondary}"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
 
-                <TextBlock Text="ThreatGuard AI"
-                           FontSize="28"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           Margin="0,20,0,35"/>
+                <StackPanel Grid.Row="1" Margin="0,34,0,0">
+                    <TextBlock Text="SECURITY MODULES"
+                               Style="{StaticResource MicroLabelStyle}"
+                               Margin="0,0,0,10"/>
+                    <Button x:Name="NavDashboard"
+                            Content="Dashboard"
+                            Style="{StaticResource NavButtonStyle}"
+                            Background="#212A36"
+                            Foreground="{StaticResource TextPrimary}"
+                            Click="NavDashboard_Click"/>
+                    <Button x:Name="NavTraining"
+                            Content="Model Training"
+                            Style="{StaticResource NavButtonStyle}"
+                            Click="NavTraining_Click"/>
+                    <Button x:Name="NavPrediction"
+                            Content="Prediction Engine"
+                            Style="{StaticResource NavButtonStyle}"
+                            Click="NavPrediction_Click"/>
+                    <Button x:Name="NavAudit"
+                            Content="Audit Logs"
+                            Style="{StaticResource NavButtonStyle}"
+                            Click="NavAudit_Click"/>
+                </StackPanel>
 
-                <TextBlock Text="SECURITY MODULES"
-                           Foreground="#8B949E"
-                           FontSize="12"
-                           Margin="0,0,0,12"/>
-
-                <Button Content="Dashboard"
-                        Height="42"
-                        Margin="0,4"
-                        Background="#1F6FEB"
-                        Foreground="White"/>
-
-                <Button Content="Model Training"
-                        Height="42"
-                        Margin="0,4"
-                        Background="#161B22"
-                        Foreground="White"/>
-
-                <Button Content="Prediction Engine"
-                        Height="42"
-                        Margin="0,4"
-                        Background="#161B22"
-                        Foreground="White"/>
-
-                <Button Content="Audit Logs"
-                        Height="42"
-                        Margin="0,4"
-                        Background="#161B22"
-                        Foreground="White"/>
-
-                <Separator Margin="0,25"/>
-
-                <TextBlock Text="CIA SECURITY"
-                           Foreground="#8B949E"
-                           FontSize="12"
-                           Margin="0,0,0,10"/>
-
-                <WrapPanel>
-                    <Border Background="#1F6FEB" CornerRadius="6" Padding="10,5" Margin="3">
-                        <TextBlock Text="CONF" Foreground="White"/>
-                    </Border>
-
-                    <Border Background="#3FB950" CornerRadius="6" Padding="10,5" Margin="3">
-                        <TextBlock Text="INT" Foreground="White"/>
-                    </Border>
-
-                    <Border Background="#D29922" CornerRadius="6" Padding="10,5" Margin="3">
-                        <TextBlock Text="AVAIL" Foreground="White"/>
-                    </Border>
-                </WrapPanel>
-            </StackPanel>
+                <StackPanel Grid.Row="3">
+                    <TextBlock Text="CIA SECURITY POSTURE"
+                               Style="{StaticResource MicroLabelStyle}"
+                               Margin="0,0,0,10"/>
+                    <UniformGrid Columns="3">
+                        <Border Background="#113B68" CornerRadius="6" Padding="8,6" Margin="0,0,6,0">
+                            <TextBlock Text="CONF" Foreground="#BBD7FF" FontWeight="Bold" TextAlignment="Center"/>
+                        </Border>
+                        <Border Background="#123C28" CornerRadius="6" Padding="8,6" Margin="0,0,6,0">
+                            <TextBlock Text="INT" Foreground="#BFF4CC" FontWeight="Bold" TextAlignment="Center"/>
+                        </Border>
+                        <Border Background="#423313" CornerRadius="6" Padding="8,6">
+                            <TextBlock Text="AVAIL" Foreground="#FFE6A8" FontWeight="Bold" TextAlignment="Center"/>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- MAIN CONTENT -->
-        <ScrollViewer Grid.Column="1"
+        <ScrollViewer x:Name="MainScrollViewer"
+                      Grid.Column="1"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="24">
 
-            <StackPanel Margin="20">
-
-                <!-- HEADER -->
-                <Grid Margin="0,0,0,20">
+                <Grid x:Name="DashboardSection" Margin="0,0,0,18">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="380"/>
+                        <ColumnDefinition Width="430"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
                         <TextBlock Text="AI Insider Threat Detection Dashboard"
+                                   Foreground="{StaticResource TextPrimary}"
                                    FontSize="34"
-                                   FontWeight="Bold"
-                                   Foreground="White"/>
-
-                        <TextBlock Text="COS720 Project 2026"
-                                   Foreground="#8B949E"/>
+                                   FontWeight="Bold"/>
+                        <TextBlock Text="Behavioural analytics, explainable risk scoring, and audit-ready model governance"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   FontSize="14"
+                                   Margin="0,6,0,0"/>
                     </StackPanel>
 
                     <Border Grid.Column="1"
-                            Background="#161B22"
-                            CornerRadius="10"
-                            Padding="15"
-                            HorizontalAlignment="Right">
-
+                            Style="{StaticResource PanelBorderStyle}"
+                            Padding="16"
+                            HorizontalAlignment="Right"
+                            Width="410">
                         <DockPanel>
                             <Ellipse x:Name="StatusDot"
                                      Width="14"
                                      Height="14"
-                                     Fill="#F85149"
-                                     Margin="0,0,10,0"/>
-
+                                     Fill="{StaticResource AccentRed}"
+                                     Margin="0,0,12,0"
+                                     VerticalAlignment="Top"/>
                             <TextBlock x:Name="ModelStatusText"
-                                       Text="Model not trained."
-                                       Foreground="White"
-                                       Width="300"
+                                       Text="Model not trained. Upload the prescribed dataset to activate predictions."
+                                       Foreground="{StaticResource TextPrimary}"
                                        TextWrapping="Wrap"/>
                         </DockPanel>
                     </Border>
                 </Grid>
 
-                <!-- TOP SECTION -->
-                <UniformGrid Columns="3" Margin="0,0,0,20">
-
-                    <!-- TRAINING -->
-                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
+                <UniformGrid Columns="3" Margin="-8,0,-8,18">
+                    <Border x:Name="TrainingSection"
+                            Style="{StaticResource PanelBorderStyle}"
+                            Margin="8">
                         <StackPanel>
-                            <TextBlock Text="Model Training"
-                                       FontSize="20"
-                                       FontWeight="Bold"
-                                       Foreground="White"/>
-
+                            <TextBlock Text="Model Training" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Train locally on the prescribed Kaggle CSV with preprocessing and calibrated threshold selection."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,14"/>
                             <Button x:Name="UploadCsvButton"
-                                    Content="Upload Dataset"
-                                    Height="42"
-                                    Margin="0,15,0,8"
-                                    Background="#1F6FEB"
-                                    Foreground="White"
+                                    Content="Upload Dataset &amp; Train"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Background="{StaticResource AccentBlue}"
                                     Click="UploadCsvButton_Click"/>
-
                             <Button x:Name="RetrainModelButton"
-                                    Content="Retrain Model"
-                                    Height="42"
-                                    Margin="0,0,0,8"
+                                    Content="Retrain Last Dataset"
+                                    Style="{StaticResource PrimaryButtonStyle}"
                                     Background="#238636"
-                                    Foreground="White"
+                                    Margin="0,10,0,0"
                                     Click="RetrainModelButton_Click"/>
-
                             <Button x:Name="SaveModelButton"
                                     Content="Save Model"
-                                    Height="42"
+                                    Style="{StaticResource PrimaryButtonStyle}"
                                     Background="#8957E5"
-                                    Foreground="White"
+                                    Margin="0,10,0,0"
                                     Click="SaveModelButton_Click"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- PREDICTION -->
-                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
-                        <StackPanel>
-                            <TextBlock Text="Prediction Engine"
-                                       FontSize="20"
-                                       FontWeight="Bold"
-                                       Foreground="White"/>
-
-                            <ComboBox x:Name="SampleProfileComboBox"
-                                      Height="40"
-                                      Margin="0,15,0,8"
-                                      SelectionChanged="SampleProfileComboBox_SelectionChanged"/>
-
-                            <Button x:Name="PredictFromCsvButton"
-                                    Content="Upload CSV &amp; Predict"
-                                    Height="42"
-                                    Background="#BC4C00"
-                                    Foreground="White"
-                                    Click="PredictFromCsvButton_Click"/>
-
-                            <TextBlock x:Name="ThresholdBadge"
-                                       Margin="0,10,0,0"
-                                       Foreground="#58A6FF"
-                                       Visibility="Collapsed"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- MODEL MGMT -->
-                    <Border Background="#161B22" CornerRadius="12" Padding="20" Margin="8">
-                        <StackPanel>
-                            <TextBlock Text="Model Management"
-                                       FontSize="20"
-                                       FontWeight="Bold"
-                                       Foreground="White"/>
-
-                            <Button x:Name="LoadModelButton"
-                                    Content="Load Existing Model"
-                                    Height="42"
-                                    Margin="0,15,0,8"
-                                    Background="#D29922"
-                                    Foreground="White"
-                                    Click="LoadModelButton_Click"/>
-
-                            <Border x:Name="RiskBadge"
+                            <Border x:Name="TrainingProgressPanel"
                                     Visibility="Collapsed"
-                                    Background="#F85149"
+                                    Background="#1D2633"
+                                    BorderBrush="{StaticResource BorderMuted}"
+                                    BorderThickness="1"
                                     CornerRadius="8"
-                                    Padding="10"
-                                    Margin="0,12,0,0">
-                                <TextBlock x:Name="RiskBadgeText"
-                                           Foreground="White"
-                                           FontWeight="Bold"/>
+                                    Padding="12"
+                                    Margin="0,14,0,0">
+                                <TextBlock x:Name="TrainingProgressText"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           TextWrapping="Wrap"/>
                             </Border>
                         </StackPanel>
                     </Border>
 
+                    <Border x:Name="PredictionSection"
+                            Style="{StaticResource PanelBorderStyle}"
+                            Margin="8">
+                        <StackPanel>
+                            <TextBlock Text="Prediction Engine" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Select a vetted sample profile or score live behavioural records from CSV."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,14"/>
+                            <ComboBox x:Name="SampleProfileComboBox"
+                                      Height="40"
+                                      Foreground="#111827"
+                                      SelectionChanged="SampleProfileComboBox_SelectionChanged"/>
+                            <Button x:Name="PredictFromCsvButton"
+                                    Content="Upload CSV &amp; Predict Batch"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Background="#BC4C00"
+                                    Margin="0,10,0,0"
+                                    Click="PredictFromCsvButton_Click"/>
+                            <Border x:Name="ThresholdPanel"
+                                    Visibility="Collapsed"
+                                    Background="#10253F"
+                                    BorderBrush="#234C78"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12"
+                                    Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock x:Name="ThresholdBadge"
+                                               Foreground="#BBD7FF"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="BaselineBadge"
+                                               Foreground="{StaticResource TextSecondary}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource PanelBorderStyle}" Margin="8">
+                        <StackPanel>
+                            <TextBlock Text="Model Management" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Load validated ML.NET model files and monitor the latest prediction risk state."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,14"/>
+                            <Button x:Name="LoadModelButton"
+                                    Content="Load Existing Model"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Background="{StaticResource AccentOrange}"
+                                    Click="LoadModelButton_Click"/>
+                            <Border x:Name="RiskBadge"
+                                    Visibility="Collapsed"
+                                    Background="#193624"
+                                    BorderBrush="{StaticResource BorderMuted}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12"
+                                    Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock x:Name="RiskBadgeText"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               FontSize="18"
+                                               FontWeight="Bold"/>
+                                    <TextBlock x:Name="RiskBadgeProb"
+                                               Foreground="{StaticResource TextSecondary}"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="PreprocessPanel"
+                                    Visibility="Collapsed"
+                                    Background="#111C27"
+                                    BorderBrush="{StaticResource BorderMuted}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12"
+                                    Margin="0,14,0,0">
+                                <TextBlock x:Name="PreprocessSummary"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
                 </UniformGrid>
 
-                <!-- RESULTS -->
-                <Border Background="#161B22"
-                        CornerRadius="12"
-                        Padding="20"
-                        Margin="0,0,0,20">
+                <Grid Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.1*"/>
+                        <ColumnDefinition Width="0.9*"/>
+                    </Grid.ColumnDefinitions>
 
-                    <StackPanel>
-                        <TextBlock Text="Prediction &amp; Evaluation Results"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   Foreground="White"/>
+                    <Border Style="{StaticResource PanelBorderStyle}" Margin="0,0,9,0">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,14">
+                                <TextBlock Text="Prediction Result" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock x:Name="PredictionSourceText"
+                                           DockPanel.Dock="Right"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           HorizontalAlignment="Right"
+                                           Text="Awaiting prediction"/>
+                            </DockPanel>
 
-                        <Border x:Name="ClassificationBar"
-                                Height="24"
-                                Background="#30363D"
-                                Margin="0,15,0,10"
-                                CornerRadius="8"
-                                Visibility="Collapsed">
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.1*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border x:Name="ClassificationBadge"
+                                        Background="#1D2633"
+                                        CornerRadius="8"
+                                        Padding="16"
+                                        Margin="0,0,10,0">
+                                    <StackPanel>
+                                        <TextBlock Text="CLASSIFICATION" Style="{StaticResource MicroLabelStyle}"/>
+                                        <TextBlock x:Name="ClassificationText"
+                                                   Text="No prediction"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="1"
+                                        Background="#1D2633"
+                                        CornerRadius="8"
+                                        Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="RISK LEVEL" Style="{StaticResource MicroLabelStyle}"/>
+                                        <TextBlock x:Name="RiskLevelText"
+                                                   Text="Not scored"
+                                                   Foreground="{StaticResource TextSecondary}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="72"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Threat probability"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1"
+                                        Height="14"
+                                        Background="#273241"
+                                        CornerRadius="7"
+                                        ClipToBounds="True">
+                                    <Border x:Name="ProbabilityFill"
+                                            Width="0"
+                                            HorizontalAlignment="Left"
+                                            Background="{StaticResource AccentGreen}"
+                                            CornerRadius="7"/>
+                                </Border>
+                                <TextBlock x:Name="ProbabilityPct"
+                                           Grid.Column="2"
+                                           Text="0%"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
 
                             <Grid>
-                                <Border x:Name="ClassificationFill"
-                                        HorizontalAlignment="Left"
-                                        CornerRadius="8"
-                                        Background="#3FB950"/>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="72"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Classification confidence"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center"/>
+                                <Border Grid.Column="1"
+                                        Height="14"
+                                        Background="#273241"
+                                        CornerRadius="7"
+                                        ClipToBounds="True">
+                                    <Border x:Name="ConfidenceFill"
+                                            Width="0"
+                                            HorizontalAlignment="Left"
+                                            Background="{StaticResource AccentBlue}"
+                                            CornerRadius="7"/>
+                                </Border>
+                                <TextBlock x:Name="ConfidencePct"
+                                           Grid.Column="2"
+                                           Text="0%"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"/>
                             </Grid>
-                        </Border>
 
-                        <TextBlock x:Name="PredictionResultText"
-                                   Text="Awaiting prediction..."
-                                   FontFamily="Consolas"
-                                   Foreground="White"
+                            <Border Background="#0E141C"
+                                    BorderBrush="{StaticResource BorderMuted}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="14"
+                                    Margin="0,18,0,0">
+                                <TextBlock x:Name="PredictionExplanationText"
+                                           Text="Run a sample profile or CSV batch prediction to view the manager-readable explanation, risk breakdown, and recommended action."
+                                           Foreground="{StaticResource TextSecondary}"
+                                           TextWrapping="Wrap"
+                                           FontFamily="Segoe UI"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="FeatureImportanceCard"
+                            Grid.Column="1"
+                            Style="{StaticResource PanelBorderStyle}"
+                            Visibility="Collapsed"
+                            Margin="9,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Feature Importance" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Positive bars increase threat risk; negative bars reduce it against the benign baseline."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,14"/>
+                            <ItemsControl x:Name="FeatureBars">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="190"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="86"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Label}"
+                                                           Foreground="{StaticResource TextPrimary}"
+                                                           TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding ValueText}"
+                                                           Foreground="{StaticResource TextSecondary}"
+                                                           FontSize="11"/>
+                                            </StackPanel>
+                                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                                <Border Height="12"
+                                                        Background="#273241"
+                                                        CornerRadius="6"/>
+                                                <Border Height="12"
+                                                        Width="{Binding BarWidth}"
+                                                        Background="{Binding BarColour}"
+                                                        HorizontalAlignment="Left"
+                                                        CornerRadius="6"/>
+                                            </Grid>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding ContribText}"
+                                                       Foreground="{Binding TextColour}"
+                                                       FontWeight="Bold"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="CsvResultsCard"
+                        Style="{StaticResource PanelBorderStyle}"
+                        Visibility="Collapsed"
+                        Margin="0,0,0,18">
+                    <StackPanel>
+                        <TextBlock Text="CSV Batch Prediction Results" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock x:Name="CsvResultsSummaryText"
+                                   Foreground="{StaticResource TextSecondary}"
                                    TextWrapping="Wrap"
-                                   Margin="0,8"/>
-
-                        <TextBlock x:Name="EvaluationSummaryText"
-                                   Text="No evaluation available yet."
-                                   FontFamily="Consolas"
-                                   Foreground="#8B949E"
-                                   TextWrapping="Wrap"/>
+                                   Margin="0,8,0,12"/>
+                        <DataGrid x:Name="CsvResultsGrid"
+                                  Height="240"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  IsReadOnly="True"
+                                  GridLinesVisibility="Horizontal"
+                                  HeadersVisibility="Column"
+                                  Background="#0E141C"
+                                  Foreground="{StaticResource TextPrimary}"
+                                  RowBackground="#111923"
+                                  AlternatingRowBackground="#151E29"
+                                  BorderBrush="{StaticResource BorderMuted}"
+                                  HorizontalGridLinesBrush="{StaticResource BorderMuted}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Row" Binding="{Binding Row}" Width="70"/>
+                                <DataGridTextColumn Header="Classification" Binding="{Binding Classification}" Width="140"/>
+                                <DataGridTextColumn Header="Threat Probability" Binding="{Binding Probability}" Width="150"/>
+                                <DataGridTextColumn Header="Confidence" Binding="{Binding Confidence}" Width="120"/>
+                                <DataGridTextColumn Header="Risk Level" Binding="{Binding RiskLevel}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </StackPanel>
                 </Border>
 
-                <!-- AUDIT -->
-                <Border Background="#161B22"
-                        CornerRadius="12"
-                        Padding="20">
+                <Grid Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
+                    <Border x:Name="PreprocessingCard"
+                            Style="{StaticResource PanelBorderStyle}"
+                            Visibility="Collapsed"
+                            Margin="0,0,9,0">
+                        <StackPanel>
+                            <TextBlock Text="Preprocessing Report" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Audit summary of the cleaning steps applied before model training."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       Margin="0,8,0,12"/>
+                            <TextBox x:Name="PreprocessingReportText"
+                                     Height="260"
+                                     IsReadOnly="True"
+                                     Background="#0E141C"
+                                     Foreground="{StaticResource TextPrimary}"
+                                     BorderBrush="{StaticResource BorderMuted}"
+                                     FontFamily="Consolas"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1"
+                            Style="{StaticResource PanelBorderStyle}"
+                            Margin="9,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Evaluation &amp; Model Selection" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="Accuracy, precision, recall, F1, confusion matrix, threshold calibration, and model comparison."
+                                       Foreground="{StaticResource TextSecondary}"
+                                       Margin="0,8,0,12"
+                                       TextWrapping="Wrap"/>
+                            <TextBox x:Name="EvaluationSummaryText"
+                                     Height="260"
+                                     Text="No evaluation available yet."
+                                     IsReadOnly="True"
+                                     Background="#0E141C"
+                                     Foreground="{StaticResource TextPrimary}"
+                                     BorderBrush="{StaticResource BorderMuted}"
+                                     FontFamily="Consolas"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="AuditSection"
+                        Style="{StaticResource PanelBorderStyle}">
                     <StackPanel>
                         <DockPanel Margin="0,0,0,10">
-                            <TextBlock Text="Audit Logs"
-                                       FontSize="20"
-                                       FontWeight="Bold"
-                                       Foreground="White"/>
-
+                            <TextBlock Text="Audit Logs" Style="{StaticResource SectionTitleStyle}"/>
                             <Button x:Name="RefreshAuditBtn"
+                                    DockPanel.Dock="Right"
                                     Content="Refresh"
-                                    Width="100"
-                                    HorizontalAlignment="Right"
+                                    Width="110"
+                                    Height="34"
+                                    Background="{StaticResource PanelAltBg}"
+                                    Foreground="{StaticResource TextPrimary}"
+                                    BorderBrush="{StaticResource BorderMuted}"
                                     Click="RefreshAuditBtn_Click"/>
                         </DockPanel>
-
                         <TextBlock x:Name="AuditLogPathText"
-                                   Foreground="#8B949E"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   TextWrapping="Wrap"
                                    Margin="0,0,0,8"/>
-
                         <TextBox x:Name="AuditLogText"
                                  Height="250"
                                  IsReadOnly="True"
-                                 Background="#0D1117"
-                                 Foreground="#C9D1D9"
+                                 Background="#0E141C"
+                                 Foreground="{StaticResource TextPrimary}"
+                                 BorderBrush="{StaticResource BorderMuted}"
                                  FontFamily="Consolas"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"/>
                     </StackPanel>
                 </Border>
-
             </StackPanel>
         </ScrollViewer>
     </Grid>

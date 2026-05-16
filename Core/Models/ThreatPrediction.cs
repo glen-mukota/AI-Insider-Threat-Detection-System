@@ -43,5 +43,8 @@ namespace InsiderThreatDetection.Core.Models
         /// e.g. "LOW RISK", "HIGH RISK", "CRITICAL RISK".
         /// </summary>
         public string RiskLevel { get; set; } = string.Empty;
+
+        /// <summary>Optional short explanation of top risk drivers.</summary>
+        public string TopRiskDrivers { get; set; } = string.Empty;
     }
 }

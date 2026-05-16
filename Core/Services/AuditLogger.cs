@@ -7,8 +7,7 @@
 //    Integrity        – every log entry is time-stamped and append-only.
 //    Availability     – failures in logging never crash the detection system.
 //
-//  Software Engineering: Single Responsibility Principle – this class ONLY
-//  handles audit logging and nothing else.
+//  Software Engineering: Singleton + Single Responsibility Principle.
 // =============================================================================
 
 using System;
@@ -18,27 +17,23 @@ using System.Text;
 namespace InsiderThreatDetection.Core.Services
 {
     /// <summary>
-    /// Thread-safe append-only audit logger.
-    /// Records all security-relevant events (model training, predictions,
-    /// model saves/loads, errors) to a rotating daily log file.
+    /// Thread-safe append-only audit logger (Singleton).
+    /// Records all security-relevant events: model training, predictions,
+    /// model saves/loads, preprocessing, and errors.
     ///
-    /// In a real enterprise deployment this would write to a SIEM (Security
-    /// Information and Event Management) system. For this prototype, entries
-    /// are written to the local %TEMP%\InsiderThreatDetection\ directory.
+    /// CIA Integrity: every entry is timestamped UTC and append-only.
+    /// In a real enterprise this would integrate with a SIEM; here it writes
+    /// to %LOCALAPPDATA%\InsiderThreatDetection\Logs\.
     /// </summary>
     public sealed class AuditLogger
     {
-        // -----------------------------------------------------------------------
-        //  SINGLETON
-        // -----------------------------------------------------------------------
+        // ── Singleton ──────────────────────────────────────────────────────────
         private static readonly Lazy<AuditLogger> _instance =
             new Lazy<AuditLogger>(() => new AuditLogger());
 
         public static AuditLogger Instance => _instance.Value;
 
-        // -----------------------------------------------------------------------
-        //  STATE
-        // -----------------------------------------------------------------------
+        // ── State ──────────────────────────────────────────────────────────────
         private readonly string _logDirectory;
         private readonly object _lock = new object();
 
@@ -49,55 +44,72 @@ namespace InsiderThreatDetection.Core.Services
                 "InsiderThreatDetection", "Logs");
 
             try { Directory.CreateDirectory(_logDirectory); }
-            catch { /* If we can't create the dir, logging will silently fail */ }
+            catch { /* Logging must never prevent startup */ }
         }
 
-        // -----------------------------------------------------------------------
-        //  PUBLIC API
-        // -----------------------------------------------------------------------
+        // ── Public API ─────────────────────────────────────────────────────────
 
         public void LogModelTrained(string dataPath, int rowCount, double accuracy, double f1)
         {
             Write("MODEL_TRAINED",
-                $"Dataset=\"{dataPath}\" Rows={rowCount} Accuracy={accuracy:P2} F1={f1:P2}");
+                $"Dataset=\"{Path.GetFileName(dataPath)}\" Rows={rowCount:N0} " +
+                $"Accuracy={accuracy:P2} F1={f1:P2}");
         }
 
-        public void LogPrediction(string profileSource, string classification,
+        public void LogPrediction(string source, string classification,
                                    float probability, string riskLevel)
         {
             Write("PREDICTION",
-                $"Source=\"{profileSource}\" Result={classification} " +
+                $"Source=\"{source}\" Result={classification} " +
                 $"Probability={probability:P2} Risk={riskLevel}");
         }
 
         public void LogModelSaved(string path)
-        {
-            Write("MODEL_SAVED", $"Path=\"{path}\"");
-        }
+            => Write("MODEL_SAVED", $"Path=\"{path}\"");
 
         public void LogModelLoaded(string path)
-        {
-            Write("MODEL_LOADED", $"Path=\"{path}\"");
-        }
+            => Write("MODEL_LOADED", $"Path=\"{path}\"");
 
         public void LogError(string context, string message)
-        {
-            Write("ERROR", $"Context=\"{context}\" Message=\"{message}\"");
-        }
+            => Write("ERROR", $"Context=\"{context}\" Message=\"{message}\"");
 
         public void LogSecurityEvent(string eventType, string details)
-        {
-            Write("SECURITY_EVENT", $"Type={eventType} Details=\"{details}\"");
-        }
+            => Write("SECURITY_EVENT", $"Type={eventType} Details=\"{details}\"");
 
         public void LogPreprocessing(string report)
+            => Write("PREPROCESSING", report.Replace(Environment.NewLine, " | "));
+
+        public void LogCsvPrediction(string fileName, int rowIndex, string classification,
+                                      float probability, string riskLevel)
         {
-            Write("PREPROCESSING", report.Replace(Environment.NewLine, " | "));
+            Write("CSV_PREDICTION",
+                $"File=\"{fileName}\" Row={rowIndex} Result={classification} " +
+                $"Probability={probability:P2} Risk={riskLevel}");
         }
 
-        // -----------------------------------------------------------------------
-        //  PRIVATE HELPERS
-        // -----------------------------------------------------------------------
+        // ── Path helpers ───────────────────────────────────────────────────────
+
+        public string GetCurrentLogPath()
+            => Path.Combine(_logDirectory, $"audit_{DateTime.UtcNow:yyyyMMdd}.log");
+
+        /// <summary>Returns the last <paramref name="count"/> lines for in-app display.</summary>
+        public string GetRecentEntries(int count = 30)
+        {
+            try
+            {
+                string path = GetCurrentLogPath();
+                if (!File.Exists(path)) return "No audit entries for today yet.";
+                var lines = File.ReadAllLines(path);
+                int skip = Math.Max(0, lines.Length - count);
+                return string.Join(Environment.NewLine, lines, skip, lines.Length - skip);
+            }
+            catch
+            {
+                return "Unable to read audit log.";
+            }
+        }
+
+        // ── Private helpers ────────────────────────────────────────────────────
 
         private void Write(string eventType, string details)
         {
@@ -115,35 +127,7 @@ namespace InsiderThreatDetection.Core.Services
             }
             catch
             {
-                // Logging must never crash the application (Availability principle)
-            }
-        }
-
-        /// <summary>
-        /// Returns the current audit log file path so the UI can show the user
-        /// where logs are stored.
-        /// </summary>
-        public string GetCurrentLogPath()
-        {
-            return Path.Combine(_logDirectory, $"audit_{DateTime.UtcNow:yyyyMMdd}.log");
-        }
-
-        /// <summary>
-        /// Returns the last N lines of the current audit log for in-app display.
-        /// </summary>
-        public string GetRecentEntries(int count = 20)
-        {
-            try
-            {
-                string path = GetCurrentLogPath();
-                if (!File.Exists(path)) return "No audit entries yet.";
-                var lines = File.ReadAllLines(path);
-                int skip = Math.Max(0, lines.Length - count);
-                return string.Join(Environment.NewLine, lines, skip, lines.Length - skip);
-            }
-            catch
-            {
-                return "Unable to read audit log.";
+                // CIA Availability: logging failures must never crash the system
             }
         }
     }
