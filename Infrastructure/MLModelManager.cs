@@ -9,28 +9,24 @@ using InsiderThreatDetection.Core.Models;
 
 namespace InsiderThreatDetection.Infrastructure
 {
-    /// <summary>
-    /// Manages the full lifecycle of the threat detection model: training, evaluation,
-    /// threshold calibration, prediction, and explainability.
-    /// </summary>
     public class MLModelManager
     {
         private readonly MLContext _mlContext;
         private ITransformer? _model;
         private PredictionEngine<UserBehaviour, ThreatPrediction>? _predictionEngine;
 
-        // Evaluation metrics
         public BinaryClassificationMetrics? LastMetrics { get; private set; }
         private double _accuracy, _precision, _recall, _f1Score;
         private double[][]? _confusionMatrix;
         private float _optimalThreshold = 0.5f;
 
-        // Benign statistics for explanation
+        // Public access to optimal threshold for controller
+        public float OptimalThreshold => _optimalThreshold;
+
         private Dictionary<string, float>? _benignMeans;
         private Dictionary<string, float>? _benignStdDevs;
         public Dictionary<string, float>? BenignMeans => _benignMeans;
 
-        // Feature metadata
         private static readonly string[] NumericFeatureNames = new[]
         {
             "employee_seniority_years", "is_contractor", "employee_classification",
@@ -39,7 +35,7 @@ namespace InsiderThreatDetection.Infrastructure
             "total_files_burned", "burned_from_other",
             "is_abroad", "trip_day_number", "hostility_country_level",
             "num_entries", "num_unique_campus",
-            "late_exit_flag", "entry_during_weekend"
+            "entry_during_weekend"   // late_exit_flag excluded (zero variance)
         };
 
         private static readonly string[] CategoricalFeatureNames = new[]
@@ -72,7 +68,6 @@ namespace InsiderThreatDetection.Infrastructure
                 var data = _mlContext.Data.LoadFromTextFile<UserBehaviour>(dataPath, hasHeader: true, separatorChar: ',');
                 var split = _mlContext.Data.TrainTestSplit(data, testFraction: TestFraction);
 
-                // Balanced 1:1 sampling
                 var trainList = _mlContext.Data.CreateEnumerable<UserBehaviour>(split.TrainSet, reuseRowObject: false).ToList();
                 int maliciousCount = trainList.Count(r => r.is_malicious == 1);
                 if (maliciousCount == 0)
@@ -91,10 +86,8 @@ namespace InsiderThreatDetection.Infrastructure
 
                 ComputeBenignStats(balancedTrainData);
 
-                // Main model (FastTree)
                 _model = BuildPipeline(1.0f).Fit(balancedTrainData);
 
-                // Evaluate on untouched test set
                 var testSet = split.TestSet;
                 var predictions = _model.Transform(testSet);
                 try
@@ -109,13 +102,13 @@ namespace InsiderThreatDetection.Infrastructure
 
                 PrintDefaultMetrics(LastMetrics);
 
-                // Threshold calibration
+                // Threshold calibration: maximise F1, subject to MinPrecision
                 CalibrateAndEvaluate(testSet);
                 Console.WriteLine($"Optimal threshold: {_optimalThreshold:F3} | Acc:{_accuracy:P2} Prec:{_precision:P2} Rec:{_recall:P2} F1:{_f1Score:P2}");
 
                 _predictionEngine = _mlContext.Model.CreatePredictionEngine<UserBehaviour, ThreatPrediction>(_model);
 
-                // Multi-model comparison
+                // Multi-model comparison (uses the same balanced training set)
                 _modelComparisonResult = CompareModels(balancedTrainData, testSet);
             }
             catch (Exception ex) when (LastErrorMessage == null)
@@ -126,7 +119,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  PREDICTION
+        //  PREDICTION (raw, not yet confidence‑adjusted)
         // ---------------------------------------------------------------------
         public ThreatPrediction Predict(UserBehaviour input)
         {
@@ -134,6 +127,7 @@ namespace InsiderThreatDetection.Infrastructure
                 throw new InvalidOperationException("Model not trained or loaded.");
 
             var raw = _predictionEngine.Predict(input);
+            // Note: Classification, Confidence are set in ThreatDetectionController
             return new ThreatPrediction
             {
                 PredictedLabel = raw.Probability >= _optimalThreshold,
@@ -147,8 +141,10 @@ namespace InsiderThreatDetection.Infrastructure
         // ---------------------------------------------------------------------
         public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input)
         {
-            if (_model == null || _benignMeans == null)
+            if (_model == null)
                 throw new InvalidOperationException("Model not trained.");
+            if (_benignMeans == null)
+                return new List<(string, float, float)>();
 
             float baselineProb = Predict(input).Probability;
             var contributions = new List<(string Feature, float Contribution, float Value)>();
@@ -169,10 +165,10 @@ namespace InsiderThreatDetection.Infrastructure
         public string GenerateHumanExplanation(UserBehaviour input, ThreatPrediction prediction)
         {
             if (_benignMeans == null || _benignStdDevs == null)
-                return "Model statistics not available.";
+                return "Model statistics not available. Explanation requires benign baseline data.";
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Threat Probability: {prediction.Probability:P0}");
+            sb.AppendLine($"Threat Probability: {prediction.ThreatProbability:P0}");
 
             var anomalies = new List<(string Feature, float Value, float Mean, string Direction)>();
             foreach (var name in NumericFeatureNames)
@@ -184,7 +180,7 @@ namespace InsiderThreatDetection.Infrastructure
                     anomalies.Add((name, val, mean, val > mean ? "higher" : "lower"));
             }
 
-            if (prediction.PredictedLabel)
+            if (prediction.Classification == "MALICIOUS")
             {
                 sb.AppendLine("The activity is flagged as MALICIOUS.");
                 if (anomalies.Any())
@@ -210,7 +206,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  EVALUATION / COMPARISON REPORT — all hardcoded numbers match live metrics
+        //  EVALUATION / COMPARISON REPORT
         // ---------------------------------------------------------------------
         public string GetEvaluationSummary()
         {
@@ -239,10 +235,8 @@ namespace InsiderThreatDetection.Infrastructure
             sb.AppendLine("Original dataset: ~5% malicious, 95% normal. Training set balanced to 1:1 ratio via random undersampling of normal class.");
             sb.AppendLine();
             sb.AppendLine("--- Threshold Rationale ---");
-            sb.AppendLine("Threshold 0.57 chosen to maximise recall (95.72%) while keeping precision at least 60%.");
-            sb.AppendLine("In insider threat detection, missing a real threat (false negative) is far more costly than");
-            sb.AppendLine("an unnecessary investigation (false positive). This threshold reduces false negatives significantly");
-            sb.AppendLine("compared to the default 0.5 threshold, catching 95.72% of all malicious activities.");
+            sb.AppendLine($"Threshold {_optimalThreshold:F2} chosen to maximise F1‑score while maintaining precision ≥ 60%.");
+            sb.AppendLine("In insider threat detection, both missing threats and false alarms are costly. This balance optimises overall correctness.");
             sb.AppendLine();
 
             if (!string.IsNullOrEmpty(_modelComparisonResult))
@@ -252,16 +246,24 @@ namespace InsiderThreatDetection.Infrastructure
                 sb.AppendLine();
                 sb.AppendLine("Model selection rationale:");
                 sb.AppendLine("  FastTree selected for insider threat detection because:");
-                sb.AppendLine("  1. Highest F1 (72.69%) balances recall and precision on this imbalanced dataset.");
-                sb.AppendLine("  2. Tree‑based models are interpretable – feature importance is directly available,");
+                sb.AppendLine("  1. Strongest overall F1‑score, balancing recall and precision on this imbalanced dataset.");
+                sb.AppendLine("  2. Tree‑based models are inherently interpretable – feature importance is directly available,");
                 sb.AppendLine("     supporting the explainability requirement.");
-                sb.AppendLine("  3. SDCA Logistic achieves higher precision (88.26%) but catastrophically low recall");
-                sb.AppendLine("     (33.98%) – it would miss 66% of actual insider threats, unacceptable for security.");
-                sb.AppendLine("  4. FastTree's 96.61% recall means only 3.39% of threats are missed.");
-                sb.AppendLine("  5. FastTree handles non‑linear behavioural patterns better than linear models.");
+                sb.AppendLine("  3. SDCA Logistic achieves higher precision but critically low recall – it misses a large");
+                sb.AppendLine("     proportion of actual threats, which is unacceptable in a security context.");
+                sb.AppendLine("  4. FastTree captures non‑linear behavioural patterns more effectively than linear models.");
+                sb.AppendLine("  5. FastForest also performs well but is slightly less explainable than a single boosted tree.");
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Public access to the multi‑model comparison string (for UI).
+        /// </summary>
+        public string GetModelComparisonTable()
+        {
+            return _modelComparisonResult ?? "Model comparison not available. Train the model first.";
         }
 
         // ---------------------------------------------------------------------
@@ -278,11 +280,10 @@ namespace InsiderThreatDetection.Infrastructure
             _model = _mlContext.Model.Load(path, out _);
             _predictionEngine = _mlContext.Model.CreatePredictionEngine<UserBehaviour, ThreatPrediction>(_model);
             _optimalThreshold = 0.5f;
+            _benignMeans = null;
+            _benignStdDevs = null;
         }
 
-        // ---------------------------------------------------------------------
-        //  BASELINE PROBABILITY FOR EXPLAINABILITY
-        // ---------------------------------------------------------------------
         public float GetNeutralBaselineProbability()
         {
             if (_benignMeans == null || _predictionEngine == null)
@@ -297,7 +298,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  PIPELINE BUILDERS (MAIN + COMPARISON)
+        //  PIPELINE BUILDERS
         // ---------------------------------------------------------------------
         private IEstimator<ITransformer> BuildPipeline(float maliciousWeight)
         {
@@ -350,9 +351,6 @@ namespace InsiderThreatDetection.Infrastructure
                     exampleWeightColumnName: "Weight"));
         }
 
-        /// <summary>
-        /// FastForest (Random Forest) with Platt calibration – guarantees a Probability column.
-        /// </summary>
         private IEstimator<ITransformer> BuildFastForestPipeline(float weight)
         {
             var catColPairs = CategoricalFeatureNames
@@ -413,7 +411,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  THRESHOLD CALIBRATION
+        //  THRESHOLD CALIBRATION – maximise F1, with MinPrecision constraint
         // ---------------------------------------------------------------------
         private void CalibrateAndEvaluate(IDataView testSet)
         {
@@ -422,7 +420,7 @@ namespace InsiderThreatDetection.Infrastructure
             float[] probs = rows.Select(r => r.Probability).ToArray();
             bool[] labels = rows.Select(r => r.Label).ToArray();
 
-            double bestRecall = 0;
+            double bestF1 = 0;
             double bestThresh = 0.5;
             double[]? bestCounts = null;
 
@@ -432,9 +430,10 @@ namespace InsiderThreatDetection.Infrastructure
                 var (tp, fp, tn, fn) = CountConfusion(probs, labels, t);
                 double prec = (tp + fp) == 0 ? 0 : (double)tp / (tp + fp);
                 double rec = (tp + fn) == 0 ? 0 : (double)tp / (tp + fn);
-                if (prec >= MinPrecision && rec > bestRecall)
+                double f1 = (prec + rec) == 0 ? 0 : 2 * prec * rec / (prec + rec);
+                if (prec >= MinPrecision && f1 > bestF1)
                 {
-                    bestRecall = rec;
+                    bestF1 = f1;
                     bestThresh = t;
                     bestCounts = new[] { (double)tn, (double)fp, (double)fn, (double)tp };
                 }
@@ -490,7 +489,7 @@ namespace InsiderThreatDetection.Infrastructure
         }
 
         // ---------------------------------------------------------------------
-        //  FEATURE MANIPULATION HELPERS
+        //  FEATURE HELPERS
         // ---------------------------------------------------------------------
         private static UserBehaviour Clone(UserBehaviour src) => new()
         {

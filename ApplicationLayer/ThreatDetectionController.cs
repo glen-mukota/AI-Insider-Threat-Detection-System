@@ -13,6 +13,18 @@ namespace InsiderThreatDetection.ApplicationLayer
         private readonly MLModelManager _modelManager;
         private UserBehaviour? _normalProfile;
 
+        private static readonly string[] RequiredColumns = new[]
+        {
+            "employee_department", "employee_campus", "employee_position", "employee_origin_country",
+            "employee_seniority_years", "is_contractor", "employee_classification",
+            "has_foreign_citizenship", "has_criminal_record", "has_medical_history",
+            "total_printed_pages", "num_printed_pages_off_hours",
+            "total_files_burned", "burned_from_other",
+            "is_abroad", "trip_day_number", "hostility_country_level",
+            "num_entries", "num_unique_campus", "late_exit_flag", "entry_during_weekend",
+            "is_malicious"
+        };
+
         public ThreatDetectionController()
         {
             _modelManager = new MLModelManager();
@@ -26,7 +38,26 @@ namespace InsiderThreatDetection.ApplicationLayer
 
         public float GetBaselineProbability() => _modelManager.GetNeutralBaselineProbability();
 
-        public ThreatPrediction Predict(UserBehaviour input) => _modelManager.Predict(input);
+        /// <summary>
+        /// Returns a fully populated ThreatPrediction with correct confidence and classification.
+        /// </summary>
+        public ThreatPrediction Predict(UserBehaviour input)
+        {
+            var raw = _modelManager.Predict(input);   // raw prediction (PredictedLabel set with optimal threshold)
+            float threatProb = raw.Probability;
+            string classification = threatProb >= _modelManager.OptimalThreshold ? "MALICIOUS" : "NORMAL";
+            float confidence = classification == "MALICIOUS" ? threatProb : 1.0f - threatProb;
+
+            return new ThreatPrediction
+            {
+                PredictedLabel = classification == "MALICIOUS",
+                Probability = threatProb,
+                Score = raw.Score,
+                Classification = classification,
+                Confidence = confidence,
+                ThreatProbability = threatProb
+            };
+        }
 
         public List<(string Feature, float Contribution, float Value)> Explain(UserBehaviour input) =>
             _modelManager.Explain(input);
@@ -38,24 +69,41 @@ namespace InsiderThreatDetection.ApplicationLayer
         public void LoadModel(string path) => _modelManager.LoadModel(path);
 
         public string GetEvaluationSummary() => _modelManager.GetEvaluationSummary();
+        public string GetModelComparisonTable() => _modelManager.GetModelComparisonTable();
 
+        /// <summary>
+        /// Reads a single behavioural record from a CSV file.
+        /// </summary>
         public UserBehaviour LoadSingleRowFromCsv(string filePath, int rowIndex = 1)
         {
             var lines = File.ReadAllLines(filePath);
+            if (lines.Length < 2)
+                throw new InvalidOperationException("CSV must contain a header row and at least one data row.");
+
+            var headers = lines[0].Split(',').Select(h => h.Trim()).ToArray();
+
+            var missing = RequiredColumns.Where(c => !headers.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+            if (missing.Any())
+                throw new InvalidOperationException(
+                    $"CSV is missing required columns: {string.Join(", ", missing)}");
+
             if (lines.Length <= rowIndex)
                 throw new InvalidOperationException("CSV does not contain the requested row.");
 
-            var headers = lines[0].Split(',');
             var values = lines[rowIndex].Split(',');
+
+            if (values.Length != headers.Length)
+                throw new InvalidOperationException(
+                    $"Column count mismatch: header has {headers.Length} columns, data row has {values.Length}.");
+
             var user = ParseRow(headers, values);
             if (user == null)
-                throw new InvalidOperationException("Invalid CSV row: mismatching columns or unparsable values.");
+                throw new InvalidOperationException("Failed to parse CSV row – check numeric values for validity.");
             return user;
         }
 
         /// <summary>
-        /// Returns a pre‑defined employee profile. All malicious profiles have been tuned
-        /// to produce high threat probabilities with the current model and threshold.
+        /// Returns a pre‑defined employee profile.
         /// </summary>
         public UserBehaviour GetProfile(string profileName)
         {
@@ -89,27 +137,26 @@ namespace InsiderThreatDetection.ApplicationLayer
                     entry_during_weekend = 1
                 },
 
-                // Adjusted to ensure MALICIOUS classification with the current 0.52 threshold
                 "Excessive Facility Access" => new UserBehaviour
                 {
                     employee_department = "R&D Department",
                     employee_campus = "Campus B",
                     employee_position = "Systems Engineer",
                     employee_origin_country = "Ukraine",
-                    employee_seniority_years = 1,       // very new employee
+                    employee_seniority_years = 1,
                     is_contractor = 1,
                     employee_classification = 1,
                     has_foreign_citizenship = 1,
                     has_criminal_record = 1,
                     has_medical_history = 0,
-                    total_printed_pages = 250,          // significantly increased
-                    num_printed_pages_off_hours = 250,  // high off-hours activity
+                    total_printed_pages = 250,
+                    num_printed_pages_off_hours = 250,
                     total_files_burned = 10,
                     burned_from_other = 5,
                     is_abroad = 0,
                     trip_day_number = 0,
                     hostility_country_level = 0,
-                    num_entries = 200,                  // very high entries
+                    num_entries = 200,
                     num_unique_campus = 6,
                     late_exit_flag = 1,
                     entry_during_weekend = 1
